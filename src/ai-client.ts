@@ -216,33 +216,61 @@ function buildAiCommand(
 
 function buildCommitPrompt(diff: string, language: string, style: string): string {
   const langLabel = language === "ko" ? "한국어" : "English";
-  const styleGuide =
-    style === "conventional"
-      ? `Conventional Commits 형식을 반드시 따르세요.
-접두사는 다음 중 선택: ${CONVENTIONAL_PREFIXES.join(", ")}
-형식: <접두사>(<범위>): <설명>  (범위는 선택사항)`
-      : "";
 
-  return `아래의 [Git Diff] 내용을 분석하여 Git Commit Message를 작성해줘.
+  const conventionalGuide = style === "conventional" ? `
+[Conventional Commits 규칙]
+반드시 아래 구조를 따르세요:
+
+<type>(<scope>): <subject>
+
+<body>
+
+구조 설명:
+- type (필수): 다음 중 하나 — ${CONVENTIONAL_PREFIXES.join(", ")}
+- scope (선택): 영향 범위를 괄호 안에 표기 (예: auth, api, ui)
+- subject (필수): 50자 이내, 명령조, 핵심 요약
+- body (선택): 72자/줄 제한, "왜" 변경했는지 bullet(-) 목록으로 설명
+
+[Type 선택 기준]
+- feat: 새로운 기능 추가
+- fix: 버그 수정
+- refactor: 기능 변경 없는 코드 개선
+- docs: 문서 변경
+- style: 포맷팅, 세미콜론 등 (로직 변경 없음)
+- test: 테스트 추가/수정
+- chore: 빌드, 설정, 의존성 변경
+- perf: 성능 개선
+- ci: CI/CD 설정
+- build: 빌드 시스템 변경
+- revert: 이전 커밋 되돌림` : "";
+
+  return `아래의 [Git Diff]를 분석하여 Git Commit Message를 작성하라.
 
 [CRITICAL INSTRUCTION]
-**결과는 무조건 '${langLabel}'로 작성되어야 합니다.**
-${styleGuide}
+**결과는 무조건 '${langLabel}'로 작성되어야 한다.**
+${conventionalGuide}
 
-[작성 예시]
-feat(auth): 사용자 로그인 API 구현
+[작성 원칙]
+1. subject는 "무엇을" 했는지 — 명령조 사용 ("추가", "수정", "제거")
+2. body는 "왜" 변경했는지 — 구체적 변경 내용을 bullet(-)로 나열
+3. 하나의 메시지는 하나의 논리적 변경만 설명
+4. 부수 효과가 있으면 body에 명시
 
-- 로그인 요청 처리를 위한 컨트롤러 메서드 추가
-- JWT 토큰 발급 로직 구현
+[좋은 예시]
+feat(auth): JWT 기반 인증 미들웨어 구현
 
-[필수 규칙]
-1. 언어: **100% ${langLabel}**로 작성할 것.
-2. 형식:
-   - 첫 줄: 변경 사항을 50자 이내로 요약 (제목)
-   - 두 번째 줄: 빈 줄
-   - 세 번째 줄부터: 변경된 상세 내용을 불릿 포인트(-)로 정리
-3. 출력: 마크다운 코드 블록이나 부가 설명 없이, 오직 커밋 메시지 텍스트만 출력할 것.
-4. 제한: 어떠한 도구(Functions/Tools)도 사용하지 말 것. 오직 텍스트만 생성하라.
+- Access/Refresh 토큰 발급 로직 추가
+- 토큰 만료 시 자동 갱신 처리
+- 인증 실패 시 401 응답 통일
+
+[나쁜 예시 — 절대 이렇게 작성하지 말 것]
+- "수정함" (type 없음, 무엇을 수정했는지 불명)
+- "fix: 버그 수정" (어떤 버그인지 불명)
+- "여러가지 수정 및 기능 추가" (하나의 커밋에 여러 변경 혼합)
+
+[출력 규칙]
+- 마크다운 코드 블록(\`\`\`)이나 부가 설명 없이, 오직 커밋 메시지 텍스트만 출력
+- 어떠한 도구(Functions/Tools)도 사용하지 말 것
 
 [Git Diff]
 ${diff}`;
@@ -255,10 +283,18 @@ function buildRetryPrompt(invalidMessage: string, language: string): string {
 [현재 메시지]
 ${invalidMessage}
 
+[필수 구조]
+<type>(<scope>): <subject>
+
+<body>
+
 [규칙]
-- 첫 줄은 반드시 "${CONVENTIONAL_PREFIXES.join("|")}(<범위>): <설명>" 형식이어야 합니다.
-- ${langLabel}로 작성하세요.
-- 수정된 커밋 메시지만 출력하세요.`;
+- type은 반드시 다음 중 하나: ${CONVENTIONAL_PREFIXES.join(", ")}
+- scope는 선택사항 (괄호 안에 영향 범위)
+- subject는 50자 이내, 명령조 사용
+- body는 72자/줄 제한, bullet(-) 목록
+- ${langLabel}로 작성
+- 수정된 커밋 메시지만 출력 (다른 설명 없이)`;
 }
 
 function buildConflictPrompt(localContent: string, remoteContent: string): string {

@@ -1,5 +1,9 @@
 import { minimatch } from "minimatch";
 import { dirname, extname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import type {
   FileChange,
   SmartCommitConfig,
@@ -16,19 +20,57 @@ const SIZE_UNITS: Record<string, number> = {
   GB: 1024 * 1024 * 1024,
 };
 
+// ─── Global gitignore cache ───
+
+let globalIgnorePatterns: string[] | null = null;
+
+export async function loadGlobalGitignore(): Promise<string[]> {
+  if (globalIgnorePatterns !== null) return globalIgnorePatterns;
+
+  globalIgnorePatterns = [];
+
+  try {
+    // Get global gitignore path from git config
+    const gitignorePath = execFileSync("git", ["config", "--global", "core.excludesFile"], {
+      timeout: 3000,
+    }).toString().trim();
+
+    if (gitignorePath) {
+      const resolved = gitignorePath.startsWith("~")
+        ? join(homedir(), gitignorePath.slice(1))
+        : gitignorePath;
+
+      const content = await readFile(resolved, "utf-8");
+      globalIgnorePatterns = content
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#"));
+    }
+  } catch {
+    // No global gitignore configured — that's fine
+  }
+
+  return globalIgnorePatterns;
+}
+
 // ─── Safety classification ───
 
-export function classifyFiles(
+export async function classifyFiles(
   files: FileChange[],
   config: SmartCommitConfig,
-): SafetyResult {
+): Promise<SafetyResult> {
   const maxBytes = parseSize(config.safety.maxFileSize);
+  const globalPatterns = await loadGlobalGitignore();
+
+  // Merge config blocked patterns with global gitignore
+  const allBlockedPatterns = [...config.safety.blockedPatterns, ...globalPatterns];
+
   const blocked: FileChange[] = [];
   const warned: FileChange[] = [];
   const safe: FileChange[] = [];
 
   for (const file of files) {
-    if (isBlocked(file, config.safety.blockedPatterns, maxBytes)) {
+    if (isBlocked(file, allBlockedPatterns, maxBytes)) {
       blocked.push(file);
     } else if (isWarned(file, config.safety.warnPatterns)) {
       warned.push(file);

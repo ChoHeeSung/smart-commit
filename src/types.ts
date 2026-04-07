@@ -71,4 +71,4 @@ export interface SafetyResult {
   safe: FileChange[];
 }
 
-export type UserAction = "push" | "skip" | "cancel" | "edit";
+export type UserAction = "push" | "skip" | "cancel" | "edit" | "skip-repo" | "exit";

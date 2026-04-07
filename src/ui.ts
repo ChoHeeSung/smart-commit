@@ -49,13 +49,12 @@ export function createUI(): UI {
 
     showRepoTable(repos) {
       term("\n");
-
-      const tableData = [
-        ["  #", "Repository", "Branch", "Changes", "Status"],
-      ];
+      term.gray("  #  Repository                    Branch              Changes    Status\n");
+      term.gray("  ── ─────────────────────────────  ──────────────────  ─────────  ──────────\n");
 
       repos.forEach((repo, i) => {
-        const shortPath = repo.path.split("/").slice(-2).join("/");
+        const shortPath = truncate(repo.path.split("/").slice(-2).join("/"), 30);
+        const branch = truncate(repo.branch, 18);
         const changes =
           repo.files.length > 0
             ? `${repo.files.length} files`
@@ -63,14 +62,15 @@ export function createUI(): UI {
               ? `${repo.unpushedCommits} unpushed`
               : "-";
         const status = statusIcon(repo.status);
-        tableData.push([`  ${i + 1}`, shortPath, repo.branch, changes, status]);
-      });
+        const num = String(i + 1).padStart(2);
 
-      term.table(tableData, {
-        hasBorder: false,
-        contentHasMarkup: true,
-        width: 80,
-        fit: true,
+        const line = `  ${num} ${padEnd(shortPath, 32)}${padEnd(branch, 20)}${padEnd(changes, 11)}${status}\n`;
+
+        if (repo.status === "dirty") {
+          term.yellow(line);
+        } else {
+          term(line);
+        }
       });
 
       term("\n");
@@ -127,13 +127,15 @@ export function createUI(): UI {
         "Push (푸시 실행)",
         "Skip (로컬 커밋 유지)",
         "Cancel (커밋 취소)",
+        "Skip repo (이 저장소 건너뛰기)",
+        "Exit (종료)",
       ];
 
       term("  ▶ Select action:\n");
       const response = await term.singleColumnMenu(items).promise;
       term("\n");
 
-      const map: UserAction[] = ["push", "skip", "cancel"];
+      const map: UserAction[] = ["push", "skip", "cancel", "skip-repo", "exit"];
       return map[response.selectedIndex] ?? "skip";
     },
 
@@ -193,4 +195,16 @@ function statusIcon(status: RepoState["status"]): string {
     case "locked":
       return "🔒 Locked";
   }
+}
+
+function truncate(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen - 1) + "…";
+}
+
+function padEnd(str: string, len: number): string {
+  // Simple padding — works better than term.table for CJK characters
+  const diff = len - str.length;
+  if (diff <= 0) return str;
+  return str + " ".repeat(diff);
 }

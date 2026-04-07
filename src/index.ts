@@ -69,7 +69,7 @@ program
         continue;
       }
 
-      const safety = classifyFiles(repo.files, config);
+      const safety = await classifyFiles(repo.files, config);
 
       if (safety.blocked.length > 0) {
         ui.showBlocked(repo, safety.blocked);
@@ -142,6 +142,18 @@ program
         }
 
         const action: UserAction = isHeadless ? "push" : await ui.promptAction();
+
+        if (action === "exit") {
+          ui.showMessage("종료합니다.", "info");
+          ui.cleanup();
+          return;
+        }
+
+        if (action === "skip-repo") {
+          ui.showMessage(`${repo.path}: 저장소 건너뛰기`, "info");
+          break; // break out of groups loop, continue to next repo
+        }
+
         await commitAndPush(repo, group.files, commitMsg, action, ui, logger);
       }
     }

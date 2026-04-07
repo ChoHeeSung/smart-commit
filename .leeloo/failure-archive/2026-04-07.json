@@ -318,5 +318,149 @@
     "exitCode": null,
     "timestamp": "2026-04-07T03:13:37.248Z",
     "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/ui.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/ui.ts\",\"old_string\":\"    showRepoTable(repos) {\\n      term(\\\"\\\\n\\\");\\n\\n      const tableData = [\\n        [\\\"  #\\\", \\\"Repository\\\", \\\"Branc)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/ui.ts\",\"oldString\":\"    showRepoTable(repos) {\\n      term(\\\"\\\\n\\\");\\n\\n      const tableData = [\\n        [\\\"  #\\\", \\\"Repository\\\", \\\"Branch\\",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:38:16.437Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/ui.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/ui.ts\",\"old_string\":\"    case \\\"locked\\\":\\n      return \\\"🔒 Locked\\\";\\n  }\\n}\",\"new_string\":\"    case \\\"locked\\\":\\n      return \\\"🔒 Locked\\)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/ui.ts\",\"oldString\":\"    case \\\"locked\\\":\\n      return \\\"🔒 Locked\\\";\\n  }\\n}\",\"newString\":\"    case \\\"locked\\\":\\n      return \\\"🔒 Locked\\\";\\",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:38:35.089Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/types.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/types.ts\",\"old_string\":\"export type UserAction = \\\"push\\\" | \\\"skip\\\" | \\\"cancel\\\" | \\\"edit\\\";\",\"new_string\":\"export type UserAction = \\\"push\\)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/types.ts\",\"oldString\":\"export type UserAction = \\\"push\\\" | \\\"skip\\\" | \\\"cancel\\\" | \\\"edit\\\";\",\"newString\":\"export type UserAction = \\\"push\\\" |",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:45:00.124Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/ui.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/ui.ts\",\"old_string\":\"    async promptAction() {\\n      const items = [\\n        \\\"Push (푸시 실행)\\\",\\n        \\\"Skip (로컬 커밋 유지)\\\",\\n        \\\"Ca)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/ui.ts\",\"oldString\":\"    async promptAction() {\\n      const items = [\\n        \\\"Push (푸시 실행)\\\",\\n        \\\"Skip (로컬 커밋 유지)\\\",\\n        \\\"Canc",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:45:08.264Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "quality-check index.ts",
+    "command": "Edit /Users/heesung/work/scripts/smart-commit/src/index.ts",
+    "error": "[lint] > @blum84/smart-commit@0.2.0 lint\n> tsc --noEmit --quiet\n\nerror TS5023: Unknown compiler option '--quiet'.",
+    "exitCode": 1,
+    "timestamp": "2026-04-07T08:45:23.985Z",
+    "type": "lint"
+  },
+  {
+    "pattern": "quality-check classifier.ts",
+    "command": "Edit /Users/heesung/work/scripts/smart-commit/src/classifier.ts",
+    "error": "[lint] > @blum84/smart-commit@0.2.0 lint\n> tsc --noEmit --quiet\n\nerror TS5023: Unknown compiler option '--quiet'.",
+    "exitCode": 1,
+    "timestamp": "2026-04-07T08:46:17.273Z",
+    "type": "lint"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/classifier.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/classifier.ts\",\"old_string\":\"// ─── Safety classification ───\\n\\nexport function classifyFiles(\\n  files: FileChange[],\\n  config: SmartCommi)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/classifier.ts\",\"oldString\":\"// ─── Safety classification ───\\n\\nexport function classifyFiles(\\n  files: FileChange[],\\n  config: SmartCommitC",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:46:29.234Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "quality-check index.ts",
+    "command": "Edit /Users/heesung/work/scripts/smart-commit/src/index.ts",
+    "error": "[lint] > @blum84/smart-commit@0.2.0 lint\n> tsc --noEmit --quiet\n\nerror TS5023: Unknown compiler option '--quiet'.",
+    "exitCode": 1,
+    "timestamp": "2026-04-07T08:46:35.460Z",
+    "type": "lint"
+  },
+  {
+    "pattern": "Write /Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts",
+    "command": "Write({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts\",\"content\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { classifyFiles } from \\\"../src/classifier.js\\\";\\ni)",
+    "error": "{\"type\":\"update\",\"filePath\":\"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts\",\"content\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { classifyFiles } from \\\"../src/clas",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:46:58.631Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts\",\"old_string\":\"  it(\\\"should warn on log files\\\", async () => {\\n    const files = [makeFile(\\\"debug.log\\\"), makeFile(\\\")",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts\",\"oldString\":\"  it(\\\"should warn on log files\\\", async () => {\\n    const files = [makeFile(\\\"debug.log\\\"), makeFile(\\\"sr",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:47:39.165Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts\",\"old_string\":\"  it(\\\"should classify mixed files correctly\\\", async () => {\\n    const files = [\\n      makeFile(\\\".env)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts\",\"oldString\":\"  it(\\\"should classify mixed files correctly\\\", async () => {\\n    const files = [\\n      makeFile(\\\".env\\\"",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:47:46.920Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Write /Users/heesung/work/scripts/smart-commit/src/mcp-server.ts",
+    "command": "Write({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/mcp-server.ts\",\"content\":\"import { McpServer } from \\\"@modelcontextprotocol/sdk/server/mcp.js\\\";\\nimport { StdioServerTransport } from \\\"@mod)",
+    "error": "{\"type\":\"create\",\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/mcp-server.ts\",\"content\":\"import { McpServer } from \\\"@modelcontextprotocol/sdk/server/mcp.js\\\";\\nimport { StdioServerTranspor",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:49:02.913Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "quality-check tsup.config.ts",
+    "command": "Edit /Users/heesung/work/scripts/smart-commit/tsup.config.ts",
+    "error": "[lint] > @blum84/smart-commit@0.2.0 lint\n> tsc --noEmit --quiet\n\nerror TS5023: Unknown compiler option '--quiet'.\n\n[tsc] \u001b[96msrc/mcp-server.ts\u001b[0m:\u001b[93m190\u001b[0m:\u001b[93m7\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'string | null' is not assignable to type 'string | undefined'.\n  Type 'null' is not assignable to type 'string | undefined'.\n\n\u001b[7m190\u001b[0m       commitMsg = await ai.generateCommitMessage(summarized, config.commit.language);\n\u001b[7m   \u001b[0m \u001b[91m      ~~~~~~~~~\u001b[0m\n\n\nFound 1 error in src/mcp-",
+    "exitCode": 1,
+    "timestamp": "2026-04-07T08:49:12.536Z",
+    "type": "lint"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/mcp-server.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/mcp-server.ts\",\"old_string\":\"      commitMsg = await ai.generateCommitMessage(summarized, config.commit.language);\\n    }\\n\\n    if (!commitM)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/mcp-server.ts\",\"oldString\":\"      commitMsg = await ai.generateCommitMessage(summarized, config.commit.language);\\n    }\\n\\n    if (!commitMsg",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:49:40.149Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Write /Users/heesung/work/scripts/smart-commit/README.md",
+    "command": "Write({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/README.md\",\"content\":\"# @blum84/smart-commit\\n\\nAI 기반 지능형 Git 자동 커밋 & 푸시 CLI 도구\\n\\n현재 디렉토리 하위의 모든 Git 저장소를 스캔하여, AI(Gemini/Claude/GPT/Ollama)로 커밋)",
+    "error": "{\"type\":\"update\",\"filePath\":\"/Users/heesung/work/scripts/smart-commit/README.md\",\"content\":\"# @blum84/smart-commit\\n\\nAI 기반 지능형 Git 자동 커밋 & 푸시 CLI 도구\\n\\n현재 디렉토리 하위의 모든 Git 저장소를 스캔하여, AI(Gemini/Claude/",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:53:13.358Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/README.md",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/README.md\",\"old_string\":\"## 설정\\n\\n프로젝트 루트 또는 홈 디렉토리에\",\"new_string\":\"## 커밋 메시지 규칙\\n\\nsmart-commit은 [Conventional Commits](https://www.conventional)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/README.md\",\"oldString\":\"## 설정\\n\\n프로젝트 루트 또는 홈 디렉토리에\",\"newString\":\"## 커밋 메시지 규칙\\n\\nsmart-commit은 [Conventional Commits](https://www.conventionalcom",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:54:06.355Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/ai-client.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/ai-client.ts\",\"old_string\":\"function buildCommitPrompt(diff: string, language: string, style: string): string {\\n  const langLabel = language)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/ai-client.ts\",\"oldString\":\"function buildCommitPrompt(diff: string, language: string, style: string): string {\\n  const langLabel = language =",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:54:48.944Z",
+    "type": "file-io"
+  },
+  {
+    "pattern": "Edit /Users/heesung/work/scripts/smart-commit/src/ai-client.ts",
+    "command": "Edit({\"file_path\":\"/Users/heesung/work/scripts/smart-commit/src/ai-client.ts\",\"old_string\":\"function buildRetryPrompt(invalidMessage: string, language: string): string {\\n  const langLabel = language === \\)",
+    "error": "{\"filePath\":\"/Users/heesung/work/scripts/smart-commit/src/ai-client.ts\",\"oldString\":\"function buildRetryPrompt(invalidMessage: string, language: string): string {\\n  const langLabel = language === \\\"k",
+    "exitCode": null,
+    "timestamp": "2026-04-07T08:55:00.460Z",
+    "type": "file-io"
   }
 ]
