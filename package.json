@@ -1,0 +1,55 @@
+{
+  "name": "smart-commit",
+  "version": "0.1.0",
+  "description": "AI-powered intelligent Git auto-commit & push CLI tool",
+  "type": "module",
+  "bin": {
+    "smart-commit": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "git",
+    "commit",
+    "ai",
+    "automation",
+    "cli",
+    "gemini",
+    "claude",
+    "conventional-commits"
+  ],
+  "author": "ChoHeeSung",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChoHeeSung/smart-commit.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "cosmiconfig": "^9.0.0",
+    "execa": "^9.5.2",
+    "minimatch": "^10.0.1",
+    "pino": "^9.6.0",
+    "simple-git": "^3.27.0",
+    "terminal-kit": "^3.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/terminal-kit": "^2.5.7",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}
