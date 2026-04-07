@@ -52,7 +52,8 @@ describe("commitAndPush", () => {
   it("should stage files, commit, and push on 'push' action", async () => {
     await commitAndPush(repo, files, "feat: 테스트", "push", mockUI, logger);
 
-    expect(mockGit.add).toHaveBeenCalledWith(["src/app.ts", "src/utils.ts"]);
+    expect(mockGit.add).toHaveBeenCalledWith("src/app.ts");
+    expect(mockGit.add).toHaveBeenCalledWith("src/utils.ts");
     expect(mockGit.commit).toHaveBeenCalledWith("feat: 테스트");
     expect(mockGit.push).toHaveBeenCalled();
     expect(mockUI.showMessage).toHaveBeenCalledWith(

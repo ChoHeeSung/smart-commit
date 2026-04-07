@@ -24,10 +24,18 @@ export async function commitAndPush(
     return;
   }
 
-  // Stage only safe files
+  // Stage only safe files (skip gitignored)
   const filePaths = files.map((f) => f.path);
-  await git.add(filePaths);
-  logger.info({ repo: repo.path, files: filePaths }, "Files staged");
+  const staged: string[] = [];
+  for (const fp of filePaths) {
+    try {
+      await git.add(fp);
+      staged.push(fp);
+    } catch {
+      logger.warn({ repo: repo.path, file: fp }, "Skipped (gitignored or inaccessible)");
+    }
+  }
+  logger.info({ repo: repo.path, files: staged }, "Files staged");
 
   // Commit
   try {

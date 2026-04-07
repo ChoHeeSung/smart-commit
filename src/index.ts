@@ -199,7 +199,16 @@ program
 async function getDiff(repo: RepoState, filePaths: string[]): Promise<string> {
   const { simpleGit } = await import("simple-git");
   const git = simpleGit(repo.path);
-  await git.add(filePaths);
+
+  // Stage files one by one, skipping any that fail (e.g. gitignored)
+  for (const fp of filePaths) {
+    try {
+      await git.add(fp);
+    } catch {
+      // Skip files that can't be staged (gitignored, etc.)
+    }
+  }
+
   const diff = await git.diff(["--cached", "--", ...filePaths]);
   return diff;
 }
