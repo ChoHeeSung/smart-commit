@@ -86,8 +86,22 @@ async function inspectRepo(dir: string, logger: Logger): Promise<RepoState> {
   const statusResult = await git.status();
   const branch = statusResult.current ?? "unknown";
 
+  // Get list of ignored paths to filter them out
+  const ignoredPaths = new Set<string>();
+  try {
+    const checkIgnore = await git.raw(["check-ignore", ...statusResult.files.map((f) => f.path)]);
+    for (const line of checkIgnore.split("\n")) {
+      if (line.trim()) ignoredPaths.add(line.trim());
+    }
+  } catch {
+    // check-ignore returns non-zero if no files are ignored — that's fine
+  }
+
   const files: FileChange[] = [];
   for (const f of statusResult.files) {
+    // Skip files that are ignored by .gitignore
+    if (ignoredPaths.has(f.path)) continue;
+
     const filePath = join(dir, f.path);
     let size = 0;
     try {
