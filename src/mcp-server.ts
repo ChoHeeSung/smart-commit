@@ -27,6 +27,7 @@ const noopUI = {
   promptOfflineTemplate: async (t: string[]) => t[0] + "auto-commit",
   promptInput: async () => "",
   showMessage: () => {},
+  showSpinner: () => () => {},
   showComplete: () => {},
   cleanup: () => {},
 };

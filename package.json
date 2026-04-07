@@ -1,6 +1,6 @@
 {
   "name": "@blum84/smart-commit",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "AI-powered intelligent Git auto-commit & push CLI tool",
   "type": "module",
   "bin": {
@@ -46,6 +46,7 @@
     "minimatch": "^10.0.1",
     "pino": "^9.6.0",
     "simple-git": "^3.27.0",
+    "string-width": "^8.2.0",
     "terminal-kit": "^3.1.2",
     "zod": "^4.3.6"
   },

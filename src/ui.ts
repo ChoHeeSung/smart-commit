@@ -1,4 +1,5 @@
 import termkit from "terminal-kit";
+import stringWidth from "string-width";
 import type { RepoState, FileChange, SmartCommitConfig, UserAction } from "./types.js";
 
 const term = termkit.terminal;
@@ -14,6 +15,7 @@ export interface UI {
   promptOfflineTemplate(templates: string[]): Promise<string>;
   promptInput(label: string): Promise<string>;
   showMessage(msg: string, level: "info" | "success" | "warn" | "error"): void;
+  showSpinner(label: string): () => void;
   showComplete(): void;
   cleanup(): void;
 }
@@ -49,12 +51,19 @@ export function createUI(): UI {
 
     showRepoTable(repos) {
       term("\n");
-      term.gray("  #  Repository                    Branch              Changes    Status\n");
-      term.gray("  ── ─────────────────────────────  ──────────────────  ─────────  ──────────\n");
+
+      // Column widths
+      const COL_NUM = 4;
+      const COL_REPO = 34;
+      const COL_BRANCH = 20;
+      const COL_CHANGES = 11;
+
+      term.gray(`  ${cwPad("#", COL_NUM)}${cwPad("Repository", COL_REPO)}${cwPad("Branch", COL_BRANCH)}${cwPad("Changes", COL_CHANGES)}Status\n`);
+      term.gray(`  ${cwPad("──", COL_NUM)}${cwPad("─".repeat(30), COL_REPO)}${cwPad("─".repeat(18), COL_BRANCH)}${cwPad("─".repeat(9), COL_CHANGES)}──────────\n`);
 
       repos.forEach((repo, i) => {
-        const shortPath = truncate(repo.path.split("/").slice(-2).join("/"), 30);
-        const branch = truncate(repo.branch, 18);
+        const shortPath = cwTruncate(repo.path.split("/").slice(-2).join("/"), COL_REPO - 2);
+        const branch = cwTruncate(repo.branch, COL_BRANCH - 2);
         const changes =
           repo.files.length > 0
             ? `${repo.files.length} files`
@@ -64,7 +73,7 @@ export function createUI(): UI {
         const status = statusIcon(repo.status);
         const num = String(i + 1).padStart(2);
 
-        const line = `  ${num} ${padEnd(shortPath, 32)}${padEnd(branch, 20)}${padEnd(changes, 11)}${status}\n`;
+        const line = `  ${cwPad(num, COL_NUM)}${cwPad(shortPath, COL_REPO)}${cwPad(branch, COL_BRANCH)}${cwPad(changes, COL_CHANGES)}${status}\n`;
 
         if (repo.status === "dirty") {
           term.yellow(line);
@@ -102,7 +111,7 @@ export function createUI(): UI {
     showCommitPreview(repo, message, files) {
       const shortPath = repo.path.split("/").slice(-2).join("/");
       term.bold(`\n  📂 ${shortPath}\n`);
-      term("  ──────────────────────���──────────────────\n");
+      term("  ─────────────────────────────────────────\n");
       term.green(`  ${message.split("\n")[0]}\n`);
 
       const body = message.split("\n").slice(1).join("\n").trim();
@@ -169,6 +178,27 @@ export function createUI(): UI {
       }
     },
 
+    showSpinner(label) {
+      const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+      let idx = 0;
+      let running = true;
+
+      const interval = setInterval(() => {
+        if (!running) return;
+        term.column(1);
+        term.eraseLine();
+        term.cyan(`  ${frames[idx % frames.length]} ${label}`);
+        idx++;
+      }, 80);
+
+      return () => {
+        running = false;
+        clearInterval(interval);
+        term.column(1);
+        term.eraseLine();
+      };
+    },
+
     showComplete() {
       term("\n");
       term.bold.green("  🎉 모든 저장소 작업 완료!\n\n");
@@ -197,14 +227,26 @@ function statusIcon(status: RepoState["status"]): string {
   }
 }
 
-function truncate(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 1) + "…";
+// ─── CJK-aware string utilities ───
+
+/** Truncate string to fit within `maxWidth` terminal columns */
+function cwTruncate(str: string, maxWidth: number): string {
+  let width = 0;
+  let i = 0;
+  for (const char of str) {
+    const cw = stringWidth(char);
+    if (width + cw > maxWidth - 1) {
+      return str.slice(0, i) + "…";
+    }
+    width += cw;
+    i += char.length;
+  }
+  return str;
 }
 
-function padEnd(str: string, len: number): string {
-  // Simple padding — works better than term.table for CJK characters
-  const diff = len - str.length;
-  if (diff <= 0) return str;
-  return str + " ".repeat(diff);
+/** Pad string to exactly `targetWidth` terminal columns */
+function cwPad(str: string, targetWidth: number): string {
+  const sw = stringWidth(str);
+  if (sw >= targetWidth) return str;
+  return str + " ".repeat(targetWidth - sw);
 }

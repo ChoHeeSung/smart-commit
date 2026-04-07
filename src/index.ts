@@ -124,9 +124,11 @@ program
           }
         } else {
           // AI mode
+          const stopSpinner = ui.showSpinner("AI 커밋 메시지 생성 중...");
           const diff = await getDiff(repo, group.files.map((f) => f.path));
           const summarizedDiff = await ai.summarizeDiff(diff);
           commitMsg = await ai.generateCommitMessage(summarizedDiff, config.commit.language);
+          stopSpinner();
 
           if (!commitMsg) {
             ui.showMessage(`${repo.path} [${group.label}]: AI 메시지 생성 실패`, "warn");
