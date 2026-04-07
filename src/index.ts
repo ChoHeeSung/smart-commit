@@ -63,8 +63,15 @@ program
         // Handle unpushed commits
         if (repo.status === "clean" && repo.unpushedCommits > 0) {
           ui.showMessage(`${repo.path}: 푸시되지 않은 커밋 ${repo.unpushedCommits}개`, "info");
-          if (!isHeadless) {
+          if (options.dryRun) {
+            ui.showMessage("(dry-run) 푸시를 수행하지 않습니다.", "info");
+          } else if (!isHeadless) {
             const action = await ui.promptAction();
+            if (action === "exit") {
+              ui.showMessage("종료합니다.", "info");
+              ui.cleanup();
+              return;
+            }
             if (action === "push") {
               await commitAndPush(repo, [], "", "push", ui, logger);
             }
