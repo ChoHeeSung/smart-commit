@@ -4,7 +4,7 @@ import type { RepoState, FileChange, SmartCommitConfig, UserAction } from "./typ
 const term = termkit.terminal;
 
 export interface UI {
-  showHeader(config: SmartCommitConfig): void;
+  showHeader(config: SmartCommitConfig, version?: string): void;
   showProgress(label: string, current: number, total: number): void;
   showRepoTable(repos: RepoState[]): void;
   showBlocked(repo: RepoState, files: FileChange[]): void;
@@ -22,9 +22,9 @@ export function createUI(): UI {
   let progressBar: termkit.Terminal.ProgressBarController | null = null;
 
   return {
-    showHeader(config) {
+    showHeader(config, version) {
       term.clear();
-      term.bold.cyan("\n  Smart Commit v0.1.0\n");
+      term.bold.cyan(`\n  Smart Commit v${version ?? "unknown"}\n`);
       term.gray(`  AI: ${config.ai.primary} (fallback: ${config.ai.fallback})\n`);
       term.gray(`  Style: ${config.commit.style} | Language: ${config.commit.language}\n`);
       term("\n");

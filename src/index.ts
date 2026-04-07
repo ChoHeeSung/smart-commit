@@ -1,5 +1,9 @@
 import { Command } from "commander";
+import { createRequire } from "node:module";
 import { loadConfig } from "./config.js";
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require("../package.json");
 import { scanRepositories } from "./scanner.js";
 import { classifyFiles, groupFiles } from "./classifier.js";
 import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.js";
@@ -13,7 +17,7 @@ const program = new Command();
 program
   .name("smart-commit")
   .description("AI-powered intelligent Git auto-commit & push CLI tool")
-  .version("0.1.0")
+  .version(PKG_VERSION)
   .option("-d, --dry-run", "Preview without committing or pushing")
   .option("-g, --group <strategy>", "Grouping strategy: smart | single | manual")
   .option("-a, --ai <tool>", "AI tool: gemini | claude | gpt | ollama")
@@ -28,7 +32,7 @@ program
 
     logger.info({ options }, "smart-commit started");
 
-    ui.showHeader(config);
+    ui.showHeader(config, PKG_VERSION);
 
     // Check AI availability (skip in offline mode)
     let offlineMode = options.offline ?? false;

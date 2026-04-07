@@ -1,6 +1,6 @@
 {
   "name": "@blum84/smart-commit",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "AI-powered intelligent Git auto-commit & push CLI tool",
   "type": "module",
   "bin": {
@@ -8,7 +8,8 @@
     "smart-commit-mcp": "dist/mcp-server.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "package.json"
   ],
   "scripts": {
     "build": "tsup",

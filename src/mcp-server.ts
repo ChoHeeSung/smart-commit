@@ -1,8 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { createRequire } from "node:module";
 import { simpleGit } from "simple-git";
 import { loadConfig } from "./config.js";
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require("../package.json");
 import { scanRepositories } from "./scanner.js";
 import { classifyFiles, groupFiles } from "./classifier.js";
 import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.js";
@@ -29,7 +33,7 @@ const noopUI = {
 
 const server = new McpServer({
   name: "smart-commit",
-  version: "0.2.0",
+  version: PKG_VERSION,
 });
 
 // ─── Tool: scan ───
