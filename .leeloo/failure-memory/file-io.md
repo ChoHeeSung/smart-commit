@@ -6,3 +6,5 @@
 - [2026-04-07] `Edit /Users/heesung/work/scripts/smart-commit/src/ui.ts` — {"filePath":"/Users/heesung/work/scripts/smart-commit/src/ui.ts","oldString":"    case \"locked\":\n      return \"🔒 Lo
 - [2026-04-07] `Edit /Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts` — {"filePath":"/Users/heesung/work/scripts/smart-commit/tests/classifier.test.ts","oldString":"  it(\"should classify mixe
 - [2026-04-07] `Edit /Users/heesung/work/scripts/smart-commit/src/ai-client.ts` — {"filePath":"/Users/heesung/work/scripts/smart-commit/src/ai-client.ts","oldString":"function buildRetryPrompt(invalidMe
+- [2026-04-07] `Edit /Users/heesung/work/scripts/smart-commit/src/ui.ts` — {"filePath":"/Users/heesung/work/scripts/smart-commit/src/ui.ts","oldString":"    showHeader(config) {\n      term.clear
+- [2026-04-07] `Edit /Users/heesung/work/scripts/smart-commit/src/mcp-server.ts` — {"filePath":"/Users/heesung/work/scripts/smart-commit/src/mcp-server.ts","oldString":"  version: \"0.2.0\",","newString"
