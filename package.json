@@ -1,7 +1,7 @@
 {
   "name": "@blum84/smart-commit",
-  "version": "0.4.1",
-  "description": "AI-powered intelligent Git auto-commit & push CLI tool",
+  "version": "0.4.2",
+  "description": "Too many repos, too many commits. AI does it for you.",
   "type": "module",
   "bin": {
     "smart-commit": "dist/index.js",

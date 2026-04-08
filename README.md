@@ -1,8 +1,11 @@
 # @blum84/smart-commit
 
+> 매일 수십 개 레포지토리를 돌아다니며 일일이 커밋하다가 빡쳐서 만든 프로그램입니다.
+> "git add . && git commit -m '수정' && git push" 이런 짓 이제 그만하세요.
+
 AI 기반 지능형 Git 자동 커밋 & 푸시 CLI 도구
 
-현재 디렉토리 하위의 모든 Git 저장소를 스캔하여, AI(Gemini/Claude/GPT/Ollama)로 커밋 메시지를 자동 생성하고, 안전하게 커밋/푸시합니다.
+현재 디렉토리 하위의 모든 Git 저장소를 한 번에 스캔하여, AI(Gemini/Claude/GPT/Ollama)가 diff를 분석하고 커밋 메시지를 자동 생성합니다. `.env` 같은 위험한 파일은 알아서 걸러주고, 커밋 메시지도 Conventional Commits 형식으로 깔끔하게 만들어줍니다.
 
 ## 설치 & 실행
 
@@ -44,7 +47,8 @@ AI 도구가 없으면 자동으로 오프라인 모드(템플릿 선택)로 전
 - **Headless/CI 모드** — 비대화형 환경에서 자동 커밋/푸시
 - **Git Hook** — prepare-commit-msg / post-commit 훅 설치/제거
 - **MCP 서버** — Claude Code 등에서 MCP 도구로 사용 가능
-- **TUI** — terminal-kit 기반 프로그레스바, 테이블, 메뉴 선택
+- **에러 진단** — 커밋/푸시 실패 시 13가지 에러 패턴 분석 + 해결 가이드 자동 출력
+- **TUI** — terminal-kit 기반 프로그레스바, 테이블, 메뉴 선택 (CJK 한글 정렬 지원)
 
 ## 사용법
 
@@ -247,6 +251,7 @@ Claude Code 등에서 MCP 도구로 사용할 수 있습니다.
 | [simple-git](https://github.com/steveukx/git-js) | Git 연동 |
 | [execa](https://github.com/sindresorhus/execa) | AI CLI 서브프로세스 호출 |
 | [terminal-kit](https://github.com/cronvel/terminal-kit) | TUI (프로그레스바, 테이블, 메뉴) |
+| [string-width](https://github.com/sindresorhus/string-width) | CJK 문자 터미널 너비 계산 |
 | [minimatch](https://github.com/isaacs/minimatch) | glob 패턴 매칭 (안전 필터) |
 | [pino](https://github.com/pinojs/pino) | 구조화 로깅 |
 | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MCP 서버 |
