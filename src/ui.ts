@@ -1,5 +1,6 @@
 import termkit from "terminal-kit";
 import stringWidth from "string-width";
+import { t } from "./i18n.js";
 import type { RepoState, FileChange, SmartCommitConfig, UserAction } from "./types.js";
 
 const term = termkit.terminal;
@@ -27,8 +28,8 @@ export function createUI(): UI {
     showHeader(config, version) {
       term.clear();
       term.bold.cyan(`\n  Smart Commit v${version ?? "unknown"}\n`);
-      term.gray(`  AI: ${config.ai.primary} (fallback: ${config.ai.fallback})\n`);
-      term.gray(`  Style: ${config.commit.style} | Language: ${config.commit.language}\n`);
+      term.gray(`  ${t().aiLabel}: ${config.ai.primary} (${t().fallbackLabel}: ${config.ai.fallback})\n`);
+      term.gray(`  ${t().styleLabel}: ${config.commit.style} | ${t().langLabel}: ${config.commit.language}\n`);
       term("\n");
     },
 
@@ -58,7 +59,8 @@ export function createUI(): UI {
       const COL_BRANCH = 20;
       const COL_CHANGES = 11;
 
-      term.gray(`  ${cwPad("#", COL_NUM)}${cwPad("Repository", COL_REPO)}${cwPad("Branch", COL_BRANCH)}${cwPad("Changes", COL_CHANGES)}Status\n`);
+      const m = t();
+      term.gray(`  ${cwPad(m.thNum, COL_NUM)}${cwPad(m.thRepo, COL_REPO)}${cwPad(m.thBranch, COL_BRANCH)}${cwPad(m.thChanges, COL_CHANGES)}${m.thStatus}\n`);
       term.gray(`  ${cwPad("──", COL_NUM)}${cwPad("─".repeat(30), COL_REPO)}${cwPad("─".repeat(18), COL_BRANCH)}${cwPad("─".repeat(9), COL_CHANGES)}──────────\n`);
 
       repos.forEach((repo, i) => {
@@ -87,7 +89,7 @@ export function createUI(): UI {
 
     showBlocked(repo, files) {
       const shortPath = repo.path.split("/").slice(-1)[0];
-      term.red(`  ✖ ${shortPath}: 차단된 파일 (커밋 제외)\n`);
+      term.red(`  ✖ ${shortPath}: ${t().blocked}\n`);
       for (const f of files) {
         term.red(`    - ${f.path}\n`);
       }
@@ -96,12 +98,12 @@ export function createUI(): UI {
 
     async confirmWarned(repo, files) {
       const shortPath = repo.path.split("/").slice(-1)[0];
-      term.yellow(`  ⚠ ${shortPath}: 주의 필요한 파일\n`);
+      term.yellow(`  ⚠ ${shortPath}: ${t().warnFiles}\n`);
       for (const f of files) {
         term.yellow(`    - ${f.path}\n`);
       }
 
-      term("\n  포함하시겠습니까? ");
+      term(`\n  ${t().includeQuestion} `);
       const result = await term.yesOrNo({ yes: ["y", "ENTER"], no: ["n"] })
         .promise;
       term("\n");
@@ -132,15 +134,16 @@ export function createUI(): UI {
     },
 
     async promptAction() {
+      const m = t();
       const items = [
-        "Push (푸시 실행)",
-        "Skip (로컬 커밋 유지)",
-        "Cancel (커밋 취소)",
-        "Skip repo (이 저장소 건너뛰기)",
-        "Exit (종료)",
+        m.actionPush,
+        m.actionSkip,
+        m.actionCancel,
+        m.actionSkipRepo,
+        m.actionExit,
       ];
 
-      term("  ▶ Select action:\n");
+      term(`  ▶ ${m.selectAction}\n`);
       const response = await term.singleColumnMenu(items).promise;
       term("\n");
 
@@ -149,12 +152,12 @@ export function createUI(): UI {
     },
 
     async promptOfflineTemplate(templates) {
-      term.yellow("  ⚠ AI 사용 불가 — 오프라인 템플릿을 선택하세요:\n");
+      term.yellow(`  ⚠ ${t().offlineSelect}\n`);
       const response = await term.singleColumnMenu(templates).promise;
       term("\n");
 
       const selected = templates[response.selectedIndex];
-      term("  커밋 메시지를 입력하세요 (접두사 포함): ");
+      term(`  ${t().offlineInputMsg} `);
       const input = await term.inputField({ default: selected }).promise;
       term("\n");
       return input ?? selected;
@@ -201,7 +204,7 @@ export function createUI(): UI {
 
     showComplete() {
       term("\n");
-      term.bold.green("  🎉 모든 저장소 작업 완료!\n\n");
+      term.bold.green(`  🎉 ${t().allComplete}\n\n`);
     },
 
     cleanup() {
@@ -211,19 +214,14 @@ export function createUI(): UI {
 }
 
 function statusIcon(status: RepoState["status"]): string {
+  const m = t();
   switch (status) {
-    case "dirty":
-      return "📝 변경됨";
-    case "clean":
-      return "✅ Clean";
-    case "detached":
-      return "⚠️ Detached";
-    case "rebasing":
-      return "🔄 Rebasing";
-    case "merging":
-      return "🔀 Merging";
-    case "locked":
-      return "🔒 Locked";
+    case "dirty": return m.statusDirty;
+    case "clean": return m.statusClean;
+    case "detached": return m.statusDetached;
+    case "rebasing": return m.statusRebasing;
+    case "merging": return m.statusMerging;
+    case "locked": return m.statusLocked;
   }
 }
 

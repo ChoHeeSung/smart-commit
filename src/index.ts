@@ -10,6 +10,7 @@ import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.
 import { commitAndPush } from "./committer.js";
 import { createUI } from "./ui.js";
 import { createLogger } from "./logger.js";
+import { t, setLocale, type Locale } from "./i18n.js";
 import type { RepoState, UserAction } from "./types.js";
 
 const program = new Command();
@@ -23,7 +24,9 @@ program
   .option("-a, --ai <tool>", "AI tool: gemini | claude | gpt | ollama")
   .option("--no-interactive", "Headless mode (no prompts)")
   .option("--offline", "Offline mode (use templates instead of AI)")
+  .option("--lang <locale>", "UI language: ko | en (auto-detected from system)")
   .action(async (options) => {
+    if (options.lang) setLocale(options.lang as Locale);
     const config = await loadConfig(options);
     const logger = createLogger();
     const ui = createUI();
@@ -40,7 +43,7 @@ program
       const primaryAvail = await isAiAvailable(config.ai.primary);
       const fallbackAvail = await isAiAvailable(config.ai.fallback);
       if (!primaryAvail && !fallbackAvail) {
-        ui.showMessage("AI 도구를 찾을 수 없습니다. 오프라인 모드로 전환합니다.", "warn");
+        ui.showMessage(t().offlineSwitch, "warn");
         offlineMode = true;
         logger.warn("No AI tools available, switching to offline mode");
       } else if (!primaryAvail) {
@@ -51,7 +54,7 @@ program
     const repos = await scanRepositories(process.cwd(), ui, logger);
 
     if (repos.length === 0) {
-      ui.showMessage("변경 사항이 있는 저장소가 없습니다.", "info");
+      ui.showMessage(t().noChanges, "info");
       ui.cleanup();
       return;
     }
@@ -62,13 +65,13 @@ program
       if (repo.status !== "dirty") {
         // Handle unpushed commits
         if (repo.status === "clean" && repo.unpushedCommits > 0) {
-          ui.showMessage(`${repo.path}: 푸시되지 않은 커밋 ${repo.unpushedCommits}개`, "info");
+          ui.showMessage(`${repo.path}: ${t().unpushedFound(repo.unpushedCommits)}`, "info");
           if (options.dryRun) {
-            ui.showMessage("(dry-run) 푸시를 수행하지 않습니다.", "info");
+            ui.showMessage(t().dryRunSkipPush, "info");
           } else if (!isHeadless) {
             const action = await ui.promptAction();
             if (action === "exit") {
-              ui.showMessage("종료합니다.", "info");
+              ui.showMessage(t().exiting, "info");
               ui.cleanup();
               return;
             }
@@ -88,7 +91,7 @@ program
 
       if (safety.warned.length > 0) {
         if (isHeadless) {
-          ui.showMessage(`${repo.path}: 경고 파일 ${safety.warned.length}개 — headless 모드에서 제외`, "warn");
+          ui.showMessage(`${repo.path}: ${safety.warned.length} ${t().warnFiles} — headless`, "warn");
         } else {
           const proceed = await ui.confirmWarned(repo, safety.warned);
           if (proceed) {
@@ -98,7 +101,7 @@ program
       }
 
       if (safety.safe.length === 0) {
-        ui.showMessage(`${repo.path}: 커밋할 안전한 파일이 없습니다.`, "warn");
+        ui.showMessage(`${repo.path}: ${t().noSafeFiles}`, "warn");
         continue;
       }
 
@@ -124,16 +127,16 @@ program
           }
         } else {
           // AI mode
-          const stopSpinner = ui.showSpinner("AI 커밋 메시지 생성 중...");
+          const stopSpinner = ui.showSpinner(t().aiGenerating);
           const diff = await getDiff(repo, group.files.map((f) => f.path));
           const summarizedDiff = await ai.summarizeDiff(diff);
           commitMsg = await ai.generateCommitMessage(summarizedDiff, config.commit.language);
           stopSpinner();
 
           if (!commitMsg) {
-            ui.showMessage(`${repo.path} [${group.label}]: AI 메시지 생성 실패`, "warn");
+            ui.showMessage(`${repo.path} [${group.label}]: ${t().aiFailed}`, "warn");
             if (!isHeadless) {
-              ui.showMessage("오프라인 템플릿으로 전환합니다.", "info");
+              ui.showMessage(t().offlineSwitch, "info");
               commitMsg = await ui.promptOfflineTemplate(getOfflineTemplates());
             } else {
               commitMsg = `chore: auto-commit ${group.files.length} files`;
@@ -146,24 +149,24 @@ program
         ui.showCommitPreview(repo, commitMsg, group.files);
 
         if (group.reason) {
-          ui.showMessage(`  그룹핑 이유: ${group.reason}`, "info");
+          ui.showMessage(`  ${t().aiGroupReason}: ${group.reason}`, "info");
         }
 
         if (options.dryRun) {
-          ui.showMessage("(dry-run) 실제 커밋/푸시를 수행하지 않습니다.", "info");
+          ui.showMessage(t().dryRun, "info");
           continue;
         }
 
         const action: UserAction = isHeadless ? "push" : await ui.promptAction();
 
         if (action === "exit") {
-          ui.showMessage("종료합니다.", "info");
+          ui.showMessage(t().exiting, "info");
           ui.cleanup();
           return;
         }
 
         if (action === "skip-repo") {
-          ui.showMessage(`${repo.path}: 저장소 건너뛰기`, "info");
+          ui.showMessage(`${repo.path}: ${t().skipRepo}`, "info");
           break; // break out of groups loop, continue to next repo
         }
 
@@ -188,17 +191,17 @@ program
     if (options.uninstall) {
       const removed = await uninstallHooks(process.cwd());
       if (removed.length > 0) {
-        ui.showMessage(`훅 제거 완료: ${removed.join(", ")}`, "success");
+        ui.showMessage(`${t().hookRemoved}: ${removed.join(", ")}`, "success");
       } else {
-        ui.showMessage("제거할 smart-commit 훅이 없습니다.", "info");
+        ui.showMessage(t().hookNone, "info");
       }
     } else {
       const { installed, skipped } = await installHooks(process.cwd());
       if (installed.length > 0) {
-        ui.showMessage(`훅 설치 완료: ${installed.join(", ")}`, "success");
+        ui.showMessage(`${t().hookInstalled}: ${installed.join(", ")}`, "success");
       }
       if (skipped.length > 0) {
-        ui.showMessage(`기존 훅이 있어 건너뜀: ${skipped.join(", ")}`, "warn");
+        ui.showMessage(`${t().hookSkipped}: ${skipped.join(", ")}`, "warn");
       }
     }
 

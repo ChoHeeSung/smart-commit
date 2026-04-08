@@ -1,4 +1,5 @@
 import { simpleGit } from "simple-git";
+import { t } from "./i18n.js";
 import type { RepoState, FileChange, UserAction } from "./types.js";
 import type { UI } from "./ui.js";
 import type { Logger } from "pino";
@@ -14,7 +15,7 @@ export async function commitAndPush(
   const git = simpleGit(repo.path);
 
   if (action === "cancel") {
-    ui.showMessage(`${repo.path}: 건너뜁니다.`, "info");
+    ui.showMessage(`${repo.path}: ${t().skipping}`, "info");
     return;
   }
 
@@ -32,13 +33,13 @@ export async function commitAndPush(
       staged.push(fp);
     } catch (err) {
       const reason = parseGitError(err);
-      ui.showMessage(`${fp}: staging 건너뜀 — ${reason}`, "warn");
+      ui.showMessage(`${fp}: ${t().stagingSkipped} — ${reason}`, "warn");
       logger.warn({ repo: repo.path, file: fp, reason }, "Staging skipped");
     }
   }
 
   if (staged.length === 0) {
-    ui.showMessage(`${repo.path}: staging된 파일이 없습니다.`, "warn");
+    ui.showMessage(`${repo.path}: ${t().noStagedFiles}`, "warn");
     return;
   }
 
@@ -47,20 +48,20 @@ export async function commitAndPush(
   // Commit
   try {
     await git.commit(message);
-    ui.showMessage(`${repo.path}: 커밋 완료 (${staged.length}개 파일)`, "success");
+    ui.showMessage(`${repo.path}: ${t().commitDone} (${staged.length} ${t().filesUnit})`, "success");
     logger.info({ repo: repo.path, message }, "Committed");
   } catch (err) {
     const reason = parseGitError(err);
     logger.error({ repo: repo.path, err }, "Commit failed");
 
-    ui.showMessage(`${repo.path}: 커밋 실패`, "error");
-    ui.showMessage(`  원인: ${reason}`, "error");
+    ui.showMessage(`${repo.path}: ${t().commitFailed}`, "error");
+    ui.showMessage(`  ${t().commitFailCause}: ${reason}`, "error");
     showCommitFailureHelp(reason, ui);
     return;
   }
 
   if (action === "skip") {
-    ui.showMessage(`${repo.path}: 로컬 커밋 유지, 푸시 건너뜀`, "info");
+    ui.showMessage(`${repo.path}: ${t().localCommitKept}`, "info");
     return;
   }
 
@@ -76,32 +77,32 @@ async function pushWithRetry(
   ui: UI,
   logger: Logger,
 ): Promise<void> {
-  const stopSpinner = ui.showSpinner(`${repo.path}: 푸시 중...`);
+  const stopSpinner = ui.showSpinner(`${repo.path}: ${t().pushing}`);
 
   try {
     await git.push();
     stopSpinner();
-    ui.showMessage(`${repo.path}: 푸시 성공!`, "success");
+    ui.showMessage(`${repo.path}: ${t().pushDone}`, "success");
     logger.info({ repo: repo.path }, "Pushed");
     return;
   } catch (firstErr) {
     stopSpinner();
     const firstReason = parseGitError(firstErr);
-    ui.showMessage(`${repo.path}: 푸시 실패 — ${firstReason}`, "warn");
+    ui.showMessage(`${repo.path}: ${t().pushFailed} — ${firstReason}`, "warn");
     logger.warn({ repo: repo.path, reason: firstReason }, "Push failed");
 
     // Retry with pull
     if (isRetryable(firstReason)) {
-      ui.showMessage("  pull 후 재시도합니다...", "info");
-      const stopPull = ui.showSpinner("pull 중...");
+      ui.showMessage(`  ${t().pushRetry}`, "info");
+      const stopPull = ui.showSpinner("pull...");
 
       try {
         await git.pull();
         stopPull();
-        const stopRetry = ui.showSpinner("재푸시 중...");
+        const stopRetry = ui.showSpinner(t().pushing);
         await git.push();
         stopRetry();
-        ui.showMessage(`${repo.path}: pull 후 푸시 성공!`, "success");
+        ui.showMessage(`${repo.path}: ${t().pushRetryDone}`, "success");
         logger.info({ repo: repo.path }, "Push succeeded after pull");
         return;
       } catch (retryErr) {
@@ -109,15 +110,15 @@ async function pushWithRetry(
         const retryReason = parseGitError(retryErr);
         logger.error({ repo: repo.path, err: retryErr }, "Pull+push failed");
 
-        ui.showMessage(`${repo.path}: pull/push 실패`, "error");
-        ui.showMessage(`  원인: ${retryReason}`, "error");
+        ui.showMessage(`${repo.path}: ${t().pushFailFinal}`, "error");
+        ui.showMessage(`  ${t().commitFailCause}: ${retryReason}`, "error");
         showPushFailureHelp(retryReason, repo.branch, ui);
         return;
       }
     }
 
     // Not retryable
-    ui.showMessage(`  원인: ${firstReason}`, "error");
+    ui.showMessage(`  ${t().commitFailCause}: ${firstReason}`, "error");
     showPushFailureHelp(firstReason, repo.branch, ui);
   }
 }
@@ -126,72 +127,27 @@ async function pushWithRetry(
 
 function parseGitError(err: unknown): string {
   const msg = String(err);
+  const m = t();
 
-  // Authentication
-  if (msg.includes("Authentication failed") || msg.includes("could not read Username")) {
-    return "인증 실패 — Git 자격 증명이 만료되었거나 잘못되었습니다";
-  }
-  if (msg.includes("Permission denied") || msg.includes("403")) {
-    return "권한 없음 — 이 저장소에 push 권한이 없습니다";
-  }
+  if (msg.includes("Authentication failed") || msg.includes("could not read Username")) return m.errAuth;
+  if (msg.includes("Permission denied") || msg.includes("403")) return m.errPermission;
+  if (msg.includes("rejected") && msg.includes("non-fast-forward")) return m.errNonFastForward;
+  if (msg.includes("rejected") && msg.includes("protected branch")) return m.errProtectedBranch;
+  if (msg.includes("remote: Repository not found") || msg.includes("does not appear to be a git repository")) return m.errRepoNotFound;
+  if (msg.includes("Could not resolve host")) return m.errHostNotFound;
+  if (msg.includes("Connection refused") || msg.includes("Connection timed out")) return m.errConnection;
+  if (msg.includes("no upstream branch") || msg.includes("has no upstream")) return m.errNoUpstream;
+  if (msg.includes("src refspec") && msg.includes("does not match any")) return m.errNoRefspec;
+  if (msg.includes("large file") || msg.includes("exceeds") || msg.includes("LFS")) return m.errLargeFile;
+  if (msg.includes("nothing to commit") || msg.includes("nothing added to commit")) return m.errNothingToCommit;
+  if (msg.includes("pre-commit hook") || msg.includes("hook")) return m.errHookFailed;
+  if (msg.includes("CONFLICT") || msg.includes("conflict")) return m.errConflict;
+  if (msg.includes("not possible because you have unmerged files")) return m.errUnmerged;
+  if (msg.includes("ignored by one of your .gitignore")) return m.errGitignored;
+  if (msg.includes("index.lock") || msg.includes("Unable to create")) return m.errLockFile;
 
-  // Remote issues
-  if (msg.includes("rejected") && msg.includes("non-fast-forward")) {
-    return "원격에 더 새로운 커밋이 있음 (non-fast-forward)";
-  }
-  if (msg.includes("rejected") && msg.includes("protected branch")) {
-    return "보호된 브랜치 — 직접 push가 차단되어 있습니다 (PR 필요)";
-  }
-  if (msg.includes("remote: Repository not found") || msg.includes("does not appear to be a git repository")) {
-    return "원격 저장소를 찾을 수 없음 — URL이 잘못되었거나 저장소가 삭제됨";
-  }
-  if (msg.includes("Could not resolve host")) {
-    return "네트워크 연결 실패 — 호스트를 찾을 수 없습니다";
-  }
-  if (msg.includes("Connection refused") || msg.includes("Connection timed out")) {
-    return "네트워크 연결 실패 — 서버에 접근할 수 없습니다";
-  }
-
-  // Push specific
-  if (msg.includes("no upstream branch") || msg.includes("has no upstream")) {
-    return "upstream 브랜치 미설정";
-  }
-  if (msg.includes("src refspec") && msg.includes("does not match any")) {
-    return "push할 커밋이 없음 — 브랜치에 커밋이 존재하지 않습니다";
-  }
-  if (msg.includes("large file") || msg.includes("exceeds") || msg.includes("LFS")) {
-    return "대용량 파일 — Git LFS가 필요하거나 파일 크기 제한 초과";
-  }
-
-  // Commit specific
-  if (msg.includes("nothing to commit") || msg.includes("nothing added to commit")) {
-    return "커밋할 변경 사항이 없음";
-  }
-  if (msg.includes("pre-commit hook") || msg.includes("hook")) {
-    return "Git Hook 실패 — pre-commit 훅에서 오류 발생";
-  }
-
-  // Merge/conflict
-  if (msg.includes("CONFLICT") || msg.includes("conflict")) {
-    return "머지 충돌 발생 — 수동으로 충돌을 해결해야 합니다";
-  }
-  if (msg.includes("not possible because you have unmerged files")) {
-    return "미해결 충돌 — 이전 머지의 충돌이 해결되지 않았습니다";
-  }
-
-  // Gitignore
-  if (msg.includes("ignored by one of your .gitignore")) {
-    return ".gitignore에 의해 차단됨";
-  }
-
-  // Lock
-  if (msg.includes("index.lock") || msg.includes("Unable to create")) {
-    return "Git 잠금 — 다른 Git 프로세스가 실행 중이거나 index.lock 파일이 남아있음";
-  }
-
-  // Fallback: extract the most useful part
   const lines = msg.split("\n").filter((l) => l.trim() && !l.includes("at ") && !l.includes("node_modules"));
-  return lines[0]?.slice(0, 200) || "알 수 없는 오류";
+  return lines[0]?.slice(0, 200) || m.errUnknown;
 }
 
 function isRetryable(reason: string): boolean {
@@ -201,31 +157,20 @@ function isRetryable(reason: string): boolean {
 // ─── Help messages ───
 
 function showCommitFailureHelp(reason: string, ui: UI): void {
-  if (reason.includes("Hook")) {
-    ui.showMessage("  해결: 훅 오류를 수정하거나, 필요시 --no-verify로 우회 (권장하지 않음)", "info");
-  } else if (reason.includes("변경 사항이 없음")) {
-    ui.showMessage("  해결: 변경된 파일이 모두 gitignore 되었을 수 있습니다", "info");
-  } else if (reason.includes("잠금")) {
-    ui.showMessage("  해결: rm .git/index.lock (다른 Git 프로세스가 없는지 확인 후)", "info");
-  }
+  const m = t();
+  if (reason === m.errHookFailed) ui.showMessage(`  ${m.fixHook}`, "info");
+  else if (reason === m.errNothingToCommit) ui.showMessage(`  ${m.fixNothingToCommit}`, "info");
+  else if (reason === m.errLockFile) ui.showMessage(`  ${m.fixLock}`, "info");
 }
 
 function showPushFailureHelp(reason: string, branch: string, ui: UI): void {
-  if (reason.includes("non-fast-forward")) {
-    ui.showMessage("  해결: git pull --rebase && git push", "info");
-  } else if (reason.includes("인증")) {
-    ui.showMessage("  해결: git credential 갱신 또는 SSH 키 확인", "info");
-  } else if (reason.includes("권한")) {
-    ui.showMessage("  해결: 저장소 collaborator 권한 확인 또는 PR로 제출", "info");
-  } else if (reason.includes("보호된 브랜치")) {
-    ui.showMessage(`  해결: 새 브랜치에서 PR 생성 (git checkout -b feature/${branch})`, "info");
-  } else if (reason.includes("upstream")) {
-    ui.showMessage(`  해결: git push --set-upstream origin ${branch}`, "info");
-  } else if (reason.includes("네트워크")) {
-    ui.showMessage("  해결: 네트워크 연결 확인 후 재시도", "info");
-  } else if (reason.includes("대용량")) {
-    ui.showMessage("  해결: git lfs install && git lfs track '*.대상확장자'", "info");
-  } else if (reason.includes("충돌")) {
-    ui.showMessage("  해결: git status로 충돌 파일 확인 → 수동 해결 → git add → git commit", "info");
-  }
+  const m = t();
+  if (reason === m.errNonFastForward) ui.showMessage(`  ${m.fixNonFastForward}`, "info");
+  else if (reason === m.errAuth) ui.showMessage(`  ${m.fixAuth}`, "info");
+  else if (reason === m.errPermission) ui.showMessage(`  ${m.fixPermission}`, "info");
+  else if (reason === m.errProtectedBranch) ui.showMessage(`  ${m.fixProtectedBranch(branch)}`, "info");
+  else if (reason === m.errNoUpstream) ui.showMessage(`  ${m.fixUpstream(branch)}`, "info");
+  else if (reason === m.errHostNotFound || reason === m.errConnection) ui.showMessage(`  ${m.fixNetwork}`, "info");
+  else if (reason === m.errLargeFile) ui.showMessage(`  ${m.fixLargeFile}`, "info");
+  else if (reason === m.errConflict || reason === m.errUnmerged) ui.showMessage(`  ${m.fixConflict}`, "info");
 }

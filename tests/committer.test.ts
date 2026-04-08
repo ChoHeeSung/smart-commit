@@ -26,7 +26,10 @@ const mockUI = {
   confirmWarned: vi.fn().mockResolvedValue(true),
   showCommitPreview: vi.fn(),
   promptAction: vi.fn().mockResolvedValue("push"),
+  promptOfflineTemplate: vi.fn().mockResolvedValue("chore: "),
+  promptInput: vi.fn().mockResolvedValue(""),
   showMessage: vi.fn(),
+  showSpinner: vi.fn().mockReturnValue(() => {}),
   showComplete: vi.fn(),
   cleanup: vi.fn(),
 };
@@ -57,7 +60,7 @@ describe("commitAndPush", () => {
     expect(mockGit.commit).toHaveBeenCalledWith("feat: 테스트");
     expect(mockGit.push).toHaveBeenCalled();
     expect(mockUI.showMessage).toHaveBeenCalledWith(
-      expect.stringContaining("커밋 완료"),
+      expect.stringContaining("/test/repo"),
       "success",
     );
   });
@@ -80,7 +83,7 @@ describe("commitAndPush", () => {
 
   it("should retry push with pull on push failure", async () => {
     mockGit.push
-      .mockRejectedValueOnce(new Error("push rejected"))
+      .mockRejectedValueOnce(new Error("rejected non-fast-forward"))
       .mockResolvedValueOnce(undefined);
 
     await commitAndPush(repo, files, "feat: 테스트", "push", mockUI, logger);
@@ -95,7 +98,7 @@ describe("commitAndPush", () => {
     await commitAndPush(repo, files, "feat: 테스트", "push", mockUI, logger);
 
     expect(mockUI.showMessage).toHaveBeenCalledWith(
-      expect.stringContaining("커밋 실패"),
+      expect.stringContaining("/test/repo"),
       "error",
     );
     expect(mockGit.push).not.toHaveBeenCalled();
