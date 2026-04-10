@@ -40,6 +40,7 @@ const repo: RepoState = {
   status: "dirty",
   files: [],
   unpushedCommits: 0,
+  hasRemote: true,
 };
 
 const files: FileChange[] = [

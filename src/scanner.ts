@@ -72,15 +72,15 @@ async function inspectRepo(dir: string, logger: Logger): Promise<RepoState> {
 
   if (gitStatus === "locked") {
     logger.warn({ dir }, "Git index locked — skipping");
-    return { path: dir, branch: "", status: "locked", files: [], unpushedCommits: 0 };
+    return { path: dir, branch: "", status: "locked", files: [], unpushedCommits: 0, hasRemote: false };
   }
   if (gitStatus === "detached") {
     logger.warn({ dir }, "Detached HEAD — skipping");
-    return { path: dir, branch: "HEAD (detached)", status: "detached", files: [], unpushedCommits: 0 };
+    return { path: dir, branch: "HEAD (detached)", status: "detached", files: [], unpushedCommits: 0, hasRemote: false };
   }
   if (gitStatus === "rebasing") {
     logger.warn({ dir }, "Rebase in progress — skipping");
-    return { path: dir, branch: "", status: "rebasing", files: [], unpushedCommits: 0 };
+    return { path: dir, branch: "", status: "rebasing", files: [], unpushedCommits: 0, hasRemote: false };
   }
 
   const statusResult = await git.status();
@@ -119,12 +119,23 @@ async function inspectRepo(dir: string, logger: Logger): Promise<RepoState> {
     });
   }
 
-  let unpushedCommits = 0;
+  // Check if remote exists
+  let hasRemote = false;
   try {
-    const log = await git.log(["@{u}..HEAD"]);
-    unpushedCommits = log.total;
+    const remotes = await git.getRemotes();
+    hasRemote = remotes.length > 0;
   } catch {
-    // no upstream set
+    // failed to get remotes
+  }
+
+  let unpushedCommits = 0;
+  if (hasRemote) {
+    try {
+      const log = await git.log(["@{u}..HEAD"]);
+      unpushedCommits = log.total;
+    } catch {
+      // no upstream set
+    }
   }
 
   const repoStatus: RepoGitStatus =
@@ -134,7 +145,7 @@ async function inspectRepo(dir: string, logger: Logger): Promise<RepoState> {
         ? "dirty"
         : "clean";
 
-  return { path: dir, branch, status: repoStatus, files, unpushedCommits };
+  return { path: dir, branch, status: repoStatus, files, unpushedCommits, hasRemote };
 }
 
 async function detectGitStatus(dir: string, git: SimpleGit): Promise<RepoGitStatus> {

@@ -215,16 +215,21 @@ server.tool(
 
     // Push if requested
     if (push) {
-      try {
-        await git.push();
-        lines.push("푸시 완료!");
-      } catch {
+      const remotes = await git.getRemotes();
+      if (remotes.length === 0) {
+        lines.push("리모트 저장소 미설정 — 푸시를 건너뜁니다.");
+      } else {
         try {
-          const branch = status.current ?? "main";
-          await git.push(["--set-upstream", "origin", branch]);
-          lines.push("푸시 완료! (upstream 설정됨)");
-        } catch (pushErr) {
-          lines.push(`푸시 실패: ${pushErr}`);
+          await git.push();
+          lines.push("푸시 완료!");
+        } catch {
+          try {
+            const branch = status.current ?? "main";
+            await git.push(["--set-upstream", "origin", branch]);
+            lines.push("푸시 완료! (upstream 설정됨)");
+          } catch (pushErr) {
+            lines.push(`푸시 실패: ${pushErr}`);
+          }
         }
       }
     }

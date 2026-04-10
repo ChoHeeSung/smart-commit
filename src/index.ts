@@ -11,7 +11,7 @@ import { commitAndPush } from "./committer.js";
 import { createUI } from "./ui.js";
 import { createLogger } from "./logger.js";
 import { t, setLocale, type Locale } from "./i18n.js";
-import type { RepoState, UserAction } from "./types.js";
+import type { RepoState, UserAction, FileChange } from "./types.js";
 
 const program = new Command();
 
@@ -65,18 +65,22 @@ program
       if (repo.status !== "dirty") {
         // Handle unpushed commits
         if (repo.status === "clean" && repo.unpushedCommits > 0) {
-          ui.showMessage(`${repo.path}: ${t().unpushedFound(repo.unpushedCommits)}`, "info");
-          if (options.dryRun) {
-            ui.showMessage(t().dryRunSkipPush, "info");
-          } else if (!isHeadless) {
-            const action = await ui.promptAction();
-            if (action === "exit") {
-              ui.showMessage(t().exiting, "info");
-              ui.cleanup();
-              return;
-            }
-            if (action === "push") {
-              await commitAndPush(repo, [], "", "push", ui, logger);
+          if (!repo.hasRemote) {
+            ui.showMessage(`${repo.path}: ${t().noRemoteSkipPush}`, "info");
+          } else {
+            ui.showMessage(`${repo.path}: ${t().unpushedFound(repo.unpushedCommits)}`, "info");
+            if (options.dryRun) {
+              ui.showMessage(t().dryRunSkipPush, "info");
+            } else if (!isHeadless) {
+              const action = await ui.promptAction();
+              if (action === "exit") {
+                ui.showMessage(t().exiting, "info");
+                ui.cleanup();
+                return;
+              }
+              if (action === "push") {
+                await commitAndPush(repo, [], "", "push", ui, logger);
+              }
             }
           }
         }
@@ -128,7 +132,7 @@ program
         } else {
           // AI mode
           const stopSpinner = ui.showSpinner(t().aiGenerating);
-          const diff = await getDiff(repo, group.files.map((f) => f.path));
+          const diff = await getDiff(repo, group.files);
           const summarizedDiff = await ai.summarizeDiff(diff);
           commitMsg = await ai.generateCommitMessage(summarizedDiff, config.commit.language);
           stopSpinner();
@@ -157,7 +161,14 @@ program
           continue;
         }
 
-        const action: UserAction = isHeadless ? "push" : await ui.promptAction();
+        // No remote: commit only (skip push)
+        let action: UserAction;
+        if (!repo.hasRemote) {
+          ui.showMessage(t().noRemoteCommitOnly, "info");
+          action = "skip"; // commit + keep local (no push)
+        } else {
+          action = isHeadless ? "push" : await ui.promptAction();
+        }
 
         if (action === "exit") {
           ui.showMessage(t().exiting, "info");
@@ -208,19 +219,24 @@ program
     ui.cleanup();
   });
 
-async function getDiff(repo: RepoState, filePaths: string[]): Promise<string> {
+async function getDiff(repo: RepoState, files: FileChange[]): Promise<string> {
   const { simpleGit } = await import("simple-git");
   const git = simpleGit(repo.path);
 
   // Stage files one by one, skipping any that fail (e.g. gitignored)
-  for (const fp of filePaths) {
+  for (const f of files) {
     try {
-      await git.add(fp);
+      if (f.status === "deleted") {
+        await git.rm(f.path);
+      } else {
+        await git.add(f.path);
+      }
     } catch {
       // Skip files that can't be staged (gitignored, etc.)
     }
   }
 
+  const filePaths = files.map((f) => f.path);
   const diff = await git.diff(["--cached", "--", ...filePaths]);
   return diff;
 }

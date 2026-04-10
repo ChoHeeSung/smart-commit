@@ -72,10 +72,11 @@ export function createUI(): UI {
             : repo.unpushedCommits > 0
               ? `${repo.unpushedCommits} unpushed`
               : "-";
+        const remoteTag = repo.hasRemote ? "" : " [local]";
         const status = statusIcon(repo.status);
         const num = String(i + 1).padStart(2);
 
-        const line = `  ${cwPad(num, COL_NUM)}${cwPad(shortPath, COL_REPO)}${cwPad(branch, COL_BRANCH)}${cwPad(changes, COL_CHANGES)}${status}\n`;
+        const line = `  ${cwPad(num, COL_NUM)}${cwPad(shortPath, COL_REPO)}${cwPad(branch, COL_BRANCH)}${cwPad(changes, COL_CHANGES)}${status}${remoteTag}\n`;
 
         if (repo.status === "dirty") {
           term.yellow(line);

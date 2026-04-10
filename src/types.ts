@@ -33,6 +33,7 @@ export interface RepoState {
   status: RepoGitStatus;
   files: FileChange[];
   unpushedCommits: number;
+  hasRemote: boolean;
 }
 
 export type RepoGitStatus =

@@ -68,6 +68,8 @@ export interface Messages {
   pushFailFinal: string;
   unpushedFound: (count: number) => string;
   dryRunSkipPush: string;
+  noRemoteSkipPush: string;
+  noRemoteCommitOnly: string;
 
   // Dry-run
   dryRun: string;
@@ -177,6 +179,8 @@ const ko: Messages = {
   pushFailFinal: "pull/push 실패",
   unpushedFound: (n) => `푸시되지 않은 커밋 ${n}개`,
   dryRunSkipPush: "(dry-run) 푸시를 수행하지 않습니다.",
+  noRemoteSkipPush: "리모트 저장소 미설정 — 푸시를 건너뜁니다.",
+  noRemoteCommitOnly: "리모트 저장소 미설정 — 커밋만 수행합니다.",
 
   dryRun: "(dry-run) 실제 커밋/푸시를 수행하지 않습니다.",
 
@@ -281,6 +285,8 @@ const en: Messages = {
   pushFailFinal: "Pull/push failed",
   unpushedFound: (n) => `${n} unpushed commit(s)`,
   dryRunSkipPush: "(dry-run) Skipping push.",
+  noRemoteSkipPush: "No remote configured — skipping push.",
+  noRemoteCommitOnly: "No remote configured — commit only.",
 
   dryRun: "(dry-run) No actual commit/push performed.",
 

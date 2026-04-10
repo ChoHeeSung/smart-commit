@@ -25,16 +25,19 @@ export async function commitAndPush(
   }
 
   // Stage only safe files (skip gitignored)
-  const filePaths = files.map((f) => f.path);
   const staged: string[] = [];
-  for (const fp of filePaths) {
+  for (const f of files) {
     try {
-      await git.add(fp);
-      staged.push(fp);
+      if (f.status === "deleted") {
+        await git.rm(f.path);
+      } else {
+        await git.add(f.path);
+      }
+      staged.push(f.path);
     } catch (err) {
       const reason = parseGitError(err);
-      ui.showMessage(`${fp}: ${t().stagingSkipped} — ${reason}`, "warn");
-      logger.warn({ repo: repo.path, file: fp, reason }, "Staging skipped");
+      ui.showMessage(`${f.path}: ${t().stagingSkipped} — ${reason}`, "warn");
+      logger.warn({ repo: repo.path, file: f.path, reason }, "Staging skipped");
     }
   }
 
