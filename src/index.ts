@@ -61,6 +61,18 @@ program
 
     ui.showRepoTable(repos);
 
+    // Interactive repo selection (skip in headless mode)
+    let selectedPaths: Set<string> | null = null;
+    if (!isHeadless) {
+      const selected = await ui.selectRepos(repos);
+      if (selected.length === 0) {
+        ui.showMessage(t().noReposSelected, "info");
+        ui.cleanup();
+        return;
+      }
+      selectedPaths = new Set(selected.map((r) => r.path));
+    }
+
     for (const repo of repos) {
       if (repo.status !== "dirty") {
         // Handle unpushed commits
@@ -86,6 +98,9 @@ program
         }
         continue;
       }
+
+      // Skip repos not selected by user
+      if (selectedPaths && !selectedPaths.has(repo.path)) continue;
 
       const safety = await classifyFiles(repo.files, config);
 

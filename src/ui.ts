@@ -9,6 +9,7 @@ export interface UI {
   showHeader(config: SmartCommitConfig, version?: string): void;
   showProgress(label: string, current: number, total: number): void;
   showRepoTable(repos: RepoState[]): void;
+  selectRepos(repos: RepoState[]): Promise<RepoState[]>;
   showBlocked(repo: RepoState, files: FileChange[]): void;
   confirmWarned(repo: RepoState, files: FileChange[]): Promise<boolean>;
   showCommitPreview(repo: RepoState, message: string, files: FileChange[]): void;
@@ -86,6 +87,91 @@ export function createUI(): UI {
       });
 
       term("\n");
+    },
+
+    async selectRepos(repos) {
+      const dirtyRepos = repos.filter((r) => r.status === "dirty");
+      if (dirtyRepos.length === 0) return [];
+      if (dirtyRepos.length === 1) return dirtyRepos;
+
+      const m = t();
+      const checked = new Set<number>(dirtyRepos.map((_, i) => i));
+      let cursor = 0;
+
+      const render = () => {
+        term.column(1);
+        term.bold(`  ${m.selectRepos} ${m.selectReposHint}\n\n`);
+        for (let i = 0; i < dirtyRepos.length; i++) {
+          const repo = dirtyRepos[i];
+          const mark = checked.has(i) ? "●" : "○";
+          const shortPath = cwTruncate(repo.path.split("/").slice(-2).join("/"), 40);
+          const prefix = i === cursor ? "  ▸ " : "    ";
+          const line = `${prefix}${mark} ${shortPath} (${repo.branch}, ${repo.files.length} files)\n`;
+          if (i === cursor) {
+            term.cyan(line);
+          } else if (checked.has(i)) {
+            term.yellow(line);
+          } else {
+            term.gray(line);
+          }
+        }
+        term("\n");
+      };
+
+      // Initial render
+      render();
+
+      return new Promise<RepoState[]>((resolve) => {
+        const totalLines = dirtyRepos.length + 3; // header + blank + items + trailing blank
+
+        const redraw = () => {
+          term.up(totalLines);
+          term.eraseDisplayBelow();
+          render();
+        };
+
+        term.grabInput(true);
+        const onKey = (key: string) => {
+          switch (key) {
+            case "UP":
+              cursor = (cursor - 1 + dirtyRepos.length) % dirtyRepos.length;
+              redraw();
+              break;
+            case "DOWN":
+              cursor = (cursor + 1) % dirtyRepos.length;
+              redraw();
+              break;
+            case " ":
+              if (checked.has(cursor)) {
+                checked.delete(cursor);
+              } else {
+                checked.add(cursor);
+              }
+              redraw();
+              break;
+            case "a":
+              if (checked.size === dirtyRepos.length) {
+                checked.clear();
+              } else {
+                dirtyRepos.forEach((_, i) => checked.add(i));
+              }
+              redraw();
+              break;
+            case "ENTER":
+              term.removeListener("key", onKey);
+              term.grabInput(false);
+              resolve(dirtyRepos.filter((_, i) => checked.has(i)));
+              break;
+            case "ESCAPE":
+            case "q":
+              term.removeListener("key", onKey);
+              term.grabInput(false);
+              resolve([]);
+              break;
+          }
+        };
+        term.on("key", onKey);
+      });
     },
 
     showBlocked(repo, files) {

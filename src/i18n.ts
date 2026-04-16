@@ -81,6 +81,11 @@ export interface Messages {
   localCommitKept: string;
   allComplete: string;
 
+  // Repo selection
+  selectRepos: string;
+  selectReposHint: string;
+  noReposSelected: string;
+
   // Hook
   hookInstalled: string;
   hookSkipped: string;
@@ -190,6 +195,10 @@ const ko: Messages = {
   localCommitKept: "로컬 커밋 유지, 푸시 건너뜀",
   allComplete: "모든 저장소 작업 완료!",
 
+  selectRepos: "처리할 저장소를 선택하세요",
+  selectReposHint: "(↑↓: 이동, Space: 토글, a: 전체, Enter: 확정)",
+  noReposSelected: "선택된 저장소가 없습니다.",
+
   hookInstalled: "훅 설치 완료",
   hookSkipped: "기존 훅이 있어 건너뜀",
   hookRemoved: "훅 제거 완료",
@@ -295,6 +304,10 @@ const en: Messages = {
   exiting: "Exiting.",
   localCommitKept: "Local commit kept, push skipped",
   allComplete: "All repositories processed!",
+
+  selectRepos: "Select repositories to process",
+  selectReposHint: "(↑↓: move, Space: toggle, a: all, Enter: confirm)",
+  noReposSelected: "No repositories selected.",
 
   hookInstalled: "Hooks installed",
   hookSkipped: "Existing hooks found, skipped",
