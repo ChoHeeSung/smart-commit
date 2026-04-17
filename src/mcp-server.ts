@@ -20,8 +20,12 @@ const noopUI = {
   showHeader: () => {},
   showProgress: () => {},
   showRepoTable: () => {},
+  selectRepos: async (repos: RepoState[]) => repos,
   showBlocked: () => {},
   confirmWarned: async () => true,
+  confirmLfsInit: async () => false,
+  selectLfsExtensions: async () => [] as string[],
+  confirmLfsInstall: async () => false,
   showCommitPreview: () => {},
   promptAction: async () => "push" as const,
   promptOfflineTemplate: async (t: string[]) => t[0] + "auto-commit",
@@ -99,7 +103,7 @@ server.tool(
       `브랜치: ${status.current}`,
       "",
       `✖ 차단: ${safety.blocked.length}개`,
-      ...safety.blocked.map((f) => `  - ${f.path}`),
+      ...safety.blocked.map((b) => `  - ${b.file.path} [${b.reason}]`),
       "",
       `⚠ 경고: ${safety.warned.length}개`,
       ...safety.warned.map((f) => `  - ${f.path}`),
@@ -181,7 +185,7 @@ server.tool(
       return {
         content: [{
           type: "text",
-          text: `안전한 파일이 없습니다. 차단: ${safety.blocked.map((f) => f.path).join(", ")}`,
+          text: `안전한 파일이 없습니다. 차단: ${safety.blocked.map((b) => b.file.path).join(", ")}`,
         }],
       };
     }
@@ -210,7 +214,7 @@ server.tool(
     ];
 
     if (safety.blocked.length > 0) {
-      lines.push(`차단됨: ${safety.blocked.map((f) => f.path).join(", ")}`);
+      lines.push(`차단됨: ${safety.blocked.map((b) => b.file.path).join(", ")}`);
     }
 
     // Push if requested

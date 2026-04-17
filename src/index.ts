@@ -8,10 +8,23 @@ import { scanRepositories } from "./scanner.js";
 import { classifyFiles, groupFiles } from "./classifier.js";
 import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.js";
 import { commitAndPush } from "./committer.js";
-import { createUI } from "./ui.js";
+import { createUI, type UI } from "./ui.js";
 import { createLogger } from "./logger.js";
 import { t, setLocale, type Locale } from "./i18n.js";
-import type { RepoState, UserAction, FileChange } from "./types.js";
+import type { RepoState, UserAction, FileChange, BlockedFile, SmartCommitConfig } from "./types.js";
+import {
+  detectOs,
+  detectPackageManager,
+  isLfsInstalled,
+  getLfsVersion,
+  isLfsInitialized,
+  buildInstallPlan,
+  runInstallPlan,
+  initLfsRepo,
+  trackExtensions,
+  uniqueExtensions,
+  isBitbucketRemote,
+} from "./lfs.js";
 
 const program = new Command();
 
@@ -102,10 +115,26 @@ program
       // Skip repos not selected by user
       if (selectedPaths && !selectedPaths.has(repo.path)) continue;
 
-      const safety = await classifyFiles(repo.files, config);
+      const safety = await classifyFiles(repo.files, config, repo.path);
 
       if (safety.blocked.length > 0) {
         ui.showBlocked(repo, safety.blocked);
+      }
+
+      // Offer Git LFS for size-blocked files
+      const sizeBlocked = safety.blocked.filter((b) => b.reason === "size");
+      if (sizeBlocked.length > 0 && config.safety.lfsPrompt) {
+        const lfsAccepted = await handleLfsOption(repo, sizeBlocked, config, ui, isHeadless);
+        if (lfsAccepted.promoted.length > 0) {
+          safety.safe.push(...lfsAccepted.promoted);
+          // Remove promoted files from blocked list
+          safety.blocked = safety.blocked.filter(
+            (b) => !lfsAccepted.promoted.some((p) => p.path === b.file.path),
+          );
+          if (lfsAccepted.gitattributesFile) {
+            safety.safe.push(lfsAccepted.gitattributesFile);
+          }
+        }
       }
 
       if (safety.warned.length > 0) {
@@ -233,6 +262,149 @@ program
 
     ui.cleanup();
   });
+
+interface LfsAcceptResult {
+  promoted: FileChange[];
+  gitattributesFile: FileChange | null;
+}
+
+async function handleLfsOption(
+  repo: RepoState,
+  sizeBlocked: BlockedFile[],
+  config: SmartCommitConfig,
+  ui: UI,
+  isHeadless: boolean,
+): Promise<LfsAcceptResult> {
+  const empty: LfsAcceptResult = { promoted: [], gitattributesFile: null };
+
+  // Headless: only proceed if explicitly configured
+  if (isHeadless && !config.safety.lfsAutoTrack) {
+    ui.showMessage(t().lfsSkipHeadless, "info");
+    return empty;
+  }
+
+  // Ask user
+  if (!isHeadless) {
+    const proceed = await ui.confirmLfsInit(repo);
+    if (!proceed) {
+      ui.showMessage(t().lfsDecline, "info");
+      return empty;
+    }
+  }
+
+  // Ensure git-lfs binary exists
+  if (!isLfsInstalled()) {
+    const os = detectOs();
+    const pm = detectPackageManager(os);
+    const plan = buildInstallPlan(os, pm);
+
+    if (!plan) {
+      ui.showMessage(t().lfsNoPackageManager, "warn");
+      ui.showMessage(t().lfsManualInstallUrl, "info");
+      return empty;
+    }
+
+    let doInstall = config.safety.lfsAutoInstall;
+    if (!isHeadless) {
+      doInstall = await ui.confirmLfsInstall(plan);
+    }
+    if (!doInstall) {
+      ui.showMessage(t().lfsManualInstallUrl, "info");
+      return empty;
+    }
+
+    const stop = ui.showSpinner(t().lfsInstalling);
+    const result = await runInstallPlan(plan);
+    stop();
+
+    if (!result.ok || !isLfsInstalled()) {
+      ui.showMessage(`${t().lfsInstallFailed}: ${result.stderr.split("\n")[0] ?? ""}`, "error");
+      ui.showMessage(t().lfsManualInstallUrl, "info");
+      return empty;
+    }
+
+    const version = await getLfsVersion();
+    ui.showMessage(t().lfsInstalledOk(version ?? ""), "success");
+  }
+
+  // Extension selection
+  const filesOnly = sizeBlocked.map((b) => b.file);
+  const candidates = uniqueExtensions(filesOnly);
+  if (candidates.length === 0) return empty;
+
+  let selectedExts: string[];
+  if (isHeadless) {
+    selectedExts = config.safety.lfsTrackExtensions.length > 0
+      ? config.safety.lfsTrackExtensions
+      : candidates;
+  } else {
+    selectedExts = await ui.selectLfsExtensions(candidates);
+  }
+
+  if (selectedExts.length === 0) {
+    ui.showMessage(t().lfsNoExtensionsSelected, "info");
+    return empty;
+  }
+
+  // Initialize LFS in repo
+  if (!isLfsInitialized(repo.path)) {
+    try {
+      await initLfsRepo(repo.path);
+      ui.showMessage(t().lfsRepoInit, "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      ui.showMessage(`git lfs install failed: ${msg.split("\n")[0]}`, "error");
+      return empty;
+    }
+  }
+
+  // Update .gitattributes
+  try {
+    const added = await trackExtensions(repo.path, selectedExts);
+    if (added.length > 0) {
+      ui.showMessage(t().lfsAttrsUpdated(added.join(", ")), "success");
+    } else {
+      ui.showMessage(t().lfsAttrsNoChange, "info");
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    ui.showMessage(`.gitattributes update failed: ${msg}`, "error");
+    return empty;
+  }
+
+  // Bitbucket capacity warning
+  try {
+    const { simpleGit } = await import("simple-git");
+    const git = simpleGit(repo.path);
+    const remotes = await git.getRemotes(true);
+    if (remotes.some((r) => isBitbucketRemote(r.refs.push ?? r.refs.fetch ?? ""))) {
+      ui.showMessage(t().lfsBitbucketWarn, "warn");
+    }
+  } catch {
+    // ignore
+  }
+
+  // Promote selected extension files from blocked → safe
+  const selectedSet = new Set(selectedExts.map((e) => e.toLowerCase()));
+  const promoted: FileChange[] = [];
+  for (const b of sizeBlocked) {
+    const ext = b.file.path.slice(b.file.path.lastIndexOf(".")).toLowerCase();
+    if (selectedSet.has(ext)) {
+      promoted.push(b.file);
+    }
+  }
+
+  // .gitattributes file to include in commit
+  const gitattributesFile: FileChange = {
+    path: ".gitattributes",
+    status: "modified",
+    size: 0,
+    isBinary: false,
+  };
+
+  ui.showMessage(t().lfsFilesIncluded(promoted.length), "success");
+  return { promoted, gitattributesFile };
+}
 
 async function getDiff(repo: RepoState, files: FileChange[]): Promise<string> {
   const { simpleGit } = await import("simple-git");

@@ -16,6 +16,10 @@ export interface SmartCommitConfig {
     maxFileSize: string;
     blockedPatterns: string[];
     warnPatterns: string[];
+    lfsPrompt: boolean;
+    lfsAutoInstall: boolean;
+    lfsAutoTrack: boolean;
+    lfsTrackExtensions: string[];
   };
   commit: {
     style: "conventional" | "free";
@@ -66,10 +70,39 @@ export interface AiGroupingResult {
   }>;
 }
 
+export type BlockedReason = "size" | "binary" | "pattern";
+
+export interface BlockedFile {
+  file: FileChange;
+  reason: BlockedReason;
+}
+
 export interface SafetyResult {
-  blocked: FileChange[];
+  blocked: BlockedFile[];
   warned: FileChange[];
   safe: FileChange[];
+}
+
+export type OsKind = "darwin" | "linux" | "win32" | "unknown";
+
+export type PackageManager =
+  | "brew"
+  | "port"
+  | "apt"
+  | "dnf"
+  | "yum"
+  | "pacman"
+  | "zypper"
+  | "apk"
+  | "winget"
+  | "choco"
+  | "scoop";
+
+export interface LfsInstallPlan {
+  os: OsKind;
+  pm: PackageManager | null;
+  installCommand: string[];
+  needsSudo: boolean;
 }
 
 export type UserAction = "push" | "skip" | "cancel" | "edit" | "skip-repo" | "exit";

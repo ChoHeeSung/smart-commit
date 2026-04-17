@@ -25,6 +25,10 @@ const DEFAULT_CONFIG: SmartCommitConfig = {
       "yarn.lock",
       "pnpm-lock.yaml",
     ],
+    lfsPrompt: true,
+    lfsAutoInstall: false,
+    lfsAutoTrack: false,
+    lfsTrackExtensions: [],
   },
   commit: {
     style: "conventional",

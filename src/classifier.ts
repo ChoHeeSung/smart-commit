@@ -8,10 +8,13 @@ import type {
   FileChange,
   SmartCommitConfig,
   SafetyResult,
+  BlockedFile,
+  BlockedReason,
   CommitGroup,
   AiGroupingResult,
 } from "./types.js";
 import type { Logger } from "pino";
+import { isLfsTrackedPath } from "./lfs.js";
 
 const SIZE_UNITS: Record<string, number> = {
   B: 1,
@@ -58,6 +61,7 @@ export async function loadGlobalGitignore(): Promise<string[]> {
 export async function classifyFiles(
   files: FileChange[],
   config: SmartCommitConfig,
+  repoPath?: string,
 ): Promise<SafetyResult> {
   const maxBytes = parseSize(config.safety.maxFileSize);
   const globalPatterns = await loadGlobalGitignore();
@@ -65,14 +69,32 @@ export async function classifyFiles(
   // Merge config blocked patterns with global gitignore
   const allBlockedPatterns = [...config.safety.blockedPatterns, ...globalPatterns];
 
-  const blocked: FileChange[] = [];
+  const blocked: BlockedFile[] = [];
   const warned: FileChange[] = [];
   const safe: FileChange[] = [];
 
   for (const file of files) {
-    if (isBlocked(file, allBlockedPatterns, maxBytes)) {
-      blocked.push(file);
-    } else if (isWarned(file, config.safety.warnPatterns)) {
+    // Pattern match always blocks (security). Checked first.
+    const patternReason = matchesAny(file.path, allBlockedPatterns);
+    if (patternReason) {
+      blocked.push({ file, reason: "pattern" });
+      continue;
+    }
+
+    // Size/binary check — LFS-tracked files bypass these limits
+    const lfsTracked = repoPath ? isLfsTrackedPath(repoPath, file.path) : false;
+    if (!lfsTracked) {
+      if (file.size > maxBytes) {
+        blocked.push({ file, reason: "size" });
+        continue;
+      }
+      if (file.isBinary) {
+        blocked.push({ file, reason: "binary" });
+        continue;
+      }
+    }
+
+    if (isWarned(file, config.safety.warnPatterns)) {
       warned.push(file);
     } else {
       safe.push(file);
@@ -80,6 +102,10 @@ export async function classifyFiles(
   }
 
   return { blocked, warned, safe };
+}
+
+export function _blockedReasonLabel(reason: BlockedReason): string {
+  return reason;
 }
 
 // ─── Grouping ───
@@ -240,16 +266,6 @@ ${fileList}`;
 }
 
 // ─── Utilities ───
-
-function isBlocked(
-  file: FileChange,
-  patterns: string[],
-  maxBytes: number,
-): boolean {
-  if (file.size > maxBytes) return true;
-  if (file.isBinary) return true;
-  return matchesAny(file.path, patterns);
-}
 
 function isWarned(file: FileChange, patterns: string[]): boolean {
   return matchesAny(file.path, patterns);

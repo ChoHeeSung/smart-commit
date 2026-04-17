@@ -1,7 +1,7 @@
 import termkit from "terminal-kit";
 import stringWidth from "string-width";
 import { t } from "./i18n.js";
-import type { RepoState, FileChange, SmartCommitConfig, UserAction } from "./types.js";
+import type { RepoState, FileChange, BlockedFile, SmartCommitConfig, UserAction, LfsInstallPlan } from "./types.js";
 
 const term = termkit.terminal;
 
@@ -10,8 +10,11 @@ export interface UI {
   showProgress(label: string, current: number, total: number): void;
   showRepoTable(repos: RepoState[]): void;
   selectRepos(repos: RepoState[]): Promise<RepoState[]>;
-  showBlocked(repo: RepoState, files: FileChange[]): void;
+  showBlocked(repo: RepoState, files: BlockedFile[]): void;
   confirmWarned(repo: RepoState, files: FileChange[]): Promise<boolean>;
+  confirmLfsInit(repo: RepoState): Promise<boolean>;
+  selectLfsExtensions(extensions: string[]): Promise<string[]>;
+  confirmLfsInstall(plan: LfsInstallPlan): Promise<boolean>;
   showCommitPreview(repo: RepoState, message: string, files: FileChange[]): void;
   promptAction(): Promise<UserAction>;
   promptOfflineTemplate(templates: string[]): Promise<string>;
@@ -177,10 +180,108 @@ export function createUI(): UI {
     showBlocked(repo, files) {
       const shortPath = repo.path.split("/").slice(-1)[0];
       term.red(`  ✖ ${shortPath}: ${t().blocked}\n`);
-      for (const f of files) {
-        term.red(`    - ${f.path}\n`);
+      for (const b of files) {
+        const label =
+          b.reason === "size" ? t().blockedReasonSize
+          : b.reason === "binary" ? t().blockedReasonBinary
+          : t().blockedReasonPattern;
+        term.red(`    - ${b.file.path} `);
+        term.gray(`[${label}]\n`);
       }
       term("\n");
+    },
+
+    async confirmLfsInit(repo) {
+      const shortPath = repo.path.split("/").slice(-1)[0];
+      term.bold.cyan(`  ${t().lfsPromptTitle}\n`);
+      term.gray(`     ${t().lfsPromptDesc}\n`);
+      term(`     ${shortPath}\n`);
+      term(`\n  (Y/n) `);
+      const result = await term.yesOrNo({ yes: ["y", "ENTER"], no: ["n"] }).promise;
+      term("\n");
+      return result ?? false;
+    },
+
+    async selectLfsExtensions(extensions) {
+      if (extensions.length === 0) return [];
+      term.bold(`  ${t().lfsSelectExtensions}\n`);
+      term.gray(`  ${t().lfsSelectHint}\n\n`);
+
+      const checked = new Set<number>(extensions.map((_, i) => i));
+      let cursor = 0;
+
+      const redraw = () => {
+        term.previousLine(extensions.length);
+        for (let i = 0; i < extensions.length; i++) {
+          term.eraseLine();
+          const mark = checked.has(i) ? "[✓]" : "[ ]";
+          const line = `    ${mark} ${extensions[i]}`;
+          if (i === cursor) term.inverse(line + "\n");
+          else term(line + "\n");
+        }
+      };
+
+      // Initial render
+      for (let i = 0; i < extensions.length; i++) {
+        const mark = checked.has(i) ? "[✓]" : "[ ]";
+        const line = `    ${mark} ${extensions[i]}`;
+        if (i === cursor) term.inverse(line + "\n");
+        else term(line + "\n");
+      }
+
+      return new Promise<string[]>((resolve) => {
+        term.grabInput(true);
+        const onKey = (name: string) => {
+          switch (name) {
+            case "UP":
+              cursor = (cursor - 1 + extensions.length) % extensions.length;
+              redraw();
+              break;
+            case "DOWN":
+              cursor = (cursor + 1) % extensions.length;
+              redraw();
+              break;
+            case " ":
+              if (checked.has(cursor)) checked.delete(cursor);
+              else checked.add(cursor);
+              redraw();
+              break;
+            case "a":
+              if (checked.size === extensions.length) checked.clear();
+              else extensions.forEach((_, i) => checked.add(i));
+              redraw();
+              break;
+            case "ENTER":
+              term.removeListener("key", onKey);
+              term.grabInput(false);
+              term("\n");
+              resolve(extensions.filter((_, i) => checked.has(i)));
+              break;
+            case "ESCAPE":
+            case "q":
+              term.removeListener("key", onKey);
+              term.grabInput(false);
+              term("\n");
+              resolve([]);
+              break;
+          }
+        };
+        term.on("key", onKey);
+      });
+    },
+
+    async confirmLfsInstall(plan) {
+      const cmdStr = plan.installCommand.join(" ");
+      term.yellow(`  ⚠ ${t().lfsNotInstalled}\n`);
+      term(`     OS: ${plan.os}\n`);
+      term(`     ${t().lfsInstallPrompt(plan.pm ?? "unknown", cmdStr)}\n`);
+      if (plan.needsSudo) {
+        term.yellow(`     ${t().lfsInstallSudoWarn}\n`);
+      }
+      term(`  `);
+      const result = await term.yesOrNo({ yes: ["y", "ENTER"], no: ["n"] }).promise;
+      term("\n");
+      return result ?? false;
     },
 
     async confirmWarned(repo, files) {
