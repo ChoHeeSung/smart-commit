@@ -1,6 +1,6 @@
 {
   "name": "@blum84/smart-commit",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Too many repos, too many commits. AI does it for you.",
   "type": "module",
   "bin": {
