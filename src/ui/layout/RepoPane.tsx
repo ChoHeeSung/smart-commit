@@ -5,6 +5,10 @@ import { shortRepoPath } from "../helpers.js";
 import { cellPad } from "../width.js";
 import { useTerminalSize } from "../useTerminalSize.js";
 
+interface Props {
+  contentHeight: number;
+}
+
 interface Layout {
   viewport: number;
   colRepo: number;
@@ -12,44 +16,35 @@ interface Layout {
   colChanges: number;
 }
 
-// Prefix 구조 (모두 ASCII 고정폭):
-//   " "         1  좌측 여백
-//   "cursor"    1  focused=">" / unfocused=" "
-//   " "         1
-//   "[x]"       3  checkbox (selectable & checked="[x]", unchecked="[ ]", unselectable="   ")
-//   " "         1
-// 총 7 chars
-const PREFIX_CHARS = 7;
+// Prefix: " cursor checkbox " → 1 + 1 + 1 + 3 + 1 = 7 chars (ASCII 고정폭)
+const PREFIX = 7;
 const MIN_REPO = 18;
-const MIN_BRANCH = 7;
-const MIN_CHANGES = 7;
+const MIN_BRANCH = 6;
+const MIN_CHANGES = 6;
 
-// 상단 타이틀 2줄 + (선택적) showing 1줄 + (선택적) 위아래 "more" 2줄 → 최대 5줄
-const HEADER_ROWS = 5;
+// Heading bar(1) + repo count + showing line(최대 1) + up-more(최대 1) + down-more(최대 1)
+const CHROME_ROWS = 4;
 
-function computeLayout(columns: number, paneHeight: number): Layout {
-  const paneInner = Math.max(30, Math.floor(columns / 2) - 4);
-  const available = Math.max(MIN_REPO + MIN_BRANCH + MIN_CHANGES, paneInner - PREFIX_CHARS);
+function computeLayout(columns: number, contentHeight: number): Layout {
+  const paneInner = Math.max(30, Math.floor(columns / 2) - 2); // paddingRight 2 감안
+  const available = Math.max(MIN_REPO + MIN_BRANCH + MIN_CHANGES, paneInner - PREFIX);
   const colRepo = Math.max(MIN_REPO, Math.floor(available * 0.55));
   const colBranch = Math.max(MIN_BRANCH, Math.floor(available * 0.22));
   const colChanges = Math.max(MIN_CHANGES, available - colRepo - colBranch);
-  const viewport = Math.max(4, paneHeight - HEADER_ROWS);
+  const viewport = Math.max(3, contentHeight - CHROME_ROWS);
   return { viewport, colRepo, colBranch, colChanges };
 }
 
-export function RepoPane() {
+export function RepoPane({ contentHeight }: Props) {
   const repos = useUi((s) => s.repos);
   const phase = useUi((s) => s.phase);
   const cursor = useUi((s) => s.cursor);
   const selection = useUi((s) => s.selection);
   const activity = useUi((s) => s.activity);
-  const { columns, rows } = useTerminalSize();
+  const { columns } = useTerminalSize();
 
-  // App height = rows - 1, header panel ~ 7줄, footer ~ 2줄, 박스 border ~ 2줄
-  const paneHeight = Math.max(10, rows - 12);
-  const layout = computeLayout(columns, paneHeight);
-
-  const dirtyCount = repos.filter((r) => r.status === "dirty").length;
+  const layout = computeLayout(columns, contentHeight);
+  const dirty = repos.filter((r) => r.status === "dirty").length;
   const viewStart = computeViewStart(cursor, repos.length, layout.viewport);
   const end = Math.min(repos.length, viewStart + layout.viewport);
   const visible = repos.slice(viewStart, end);
@@ -57,13 +52,16 @@ export function RepoPane() {
   const below = repos.length - end;
   const currentPath = activity?.repoPath ?? null;
 
+  const paneWidth = Math.floor(columns / 2) - 2;
+
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Text bold color="cyan">Repos <Text dimColor>({repos.length} · {dirtyCount} changed)</Text></Text>
-      {repos.length > layout.viewport && (
-        <Text dimColor>Showing {viewStart + 1}-{end} of {repos.length}</Text>
-      )}
-      {above > 0 && <Text dimColor>   ^ {above} more</Text>}
+    <Box flexDirection="column">
+      <HeadingBar
+        width={paneWidth}
+        label="REPOS"
+        hint={`${repos.length} · ${dirty} changed  ·  Showing ${viewStart + 1}-${end} of ${repos.length}`}
+      />
+      {above > 0 ? <Text dimColor>   ^ {above} more</Text> : <Text> </Text>}
       {visible.map((repo, i) => {
         const globalIdx = viewStart + i;
         return (
@@ -78,8 +76,20 @@ export function RepoPane() {
           />
         );
       })}
-      {below > 0 && <Text dimColor>   v {below} more</Text>}
+      {below > 0 ? <Text dimColor>   v {below} more</Text> : <Text> </Text>}
     </Box>
+  );
+}
+
+function HeadingBar({ width, label, hint }: { width: number; label: string; hint: string }) {
+  const line = ` ${label} `;
+  const suffix = ` ${hint} `;
+  const fill = Math.max(0, width - line.length - suffix.length);
+  return (
+    <Text>
+      <Text bold inverse color="cyan">{line}</Text>
+      <Text dimColor>{suffix}{" ".repeat(fill)}</Text>
+    </Text>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Box, useInput } from "ink";
+import { Box, Text, useInput } from "ink";
 import { store, useUi } from "./store.js";
 import { HeaderPanel } from "./layout/HeaderPanel.js";
 import { ScanView } from "./layout/ScanView.js";
@@ -8,6 +8,11 @@ import { LogPane } from "./layout/LogPane.js";
 import { FooterBar } from "./layout/FooterBar.js";
 import { ModalArea } from "./layout/ModalArea.js";
 import { useTerminalSize } from "./useTerminalSize.js";
+
+// 레이아웃 규격 (heading bar + content 기반, 박스 테두리 없음).
+// 박스 테두리는 Ink + 넓은 터미널에서 overflow 관리에 부작용이 있어 전면 제거.
+const HEADER_ROWS = 7;   // banner(5) + meta(1) + blank(1)
+const FOOTER_ROWS = 3;   // border(2) + hint(1)
 
 export function App() {
   const phase = useUi((s) => s.phase);
@@ -27,6 +32,7 @@ export function App() {
   }, { isActive: inputActive });
 
   const appHeight = Math.max(20, rows - 1);
+  const mainHeight = Math.max(8, appHeight - HEADER_ROWS - FOOTER_ROWS);
   const inPairLayout = phase !== "idle" && phase !== "scanning";
 
   return (
@@ -34,29 +40,22 @@ export function App() {
       <HeaderPanel />
       {phase === "scanning" && <ScanView />}
       {inPairLayout && (
-        <Box flexDirection="row" flexGrow={1} overflow="hidden">
-          <Box
-            width="50%"
-            borderStyle="round"
-            borderColor="cyan"
-            flexDirection="column"
-            overflow="hidden"
-          >
-            <RepoPane />
+        <Box flexDirection="row" height={mainHeight}>
+          <Box flexBasis="50%" flexGrow={0} flexShrink={0} flexDirection="column" paddingRight={1}>
+            <RepoPane contentHeight={mainHeight} />
           </Box>
-          <Box
-            width="50%"
-            borderStyle="round"
-            borderColor="cyan"
-            flexDirection="column"
-            overflow="hidden"
-          >
+          <Box flexGrow={1} flexShrink={1} flexDirection="column" paddingLeft={1}>
             <ActivityPane />
-            <LogPane />
+            <LogPane paneHeight={mainHeight} />
           </Box>
         </Box>
       )}
       {modal ? <ModalArea modal={modal} /> : <FooterBar />}
     </Box>
   );
+}
+
+export function HBar({ width, label, count }: { width: number; label: string; count?: string }) {
+  const text = count ? ` ${label} ${count} ` : ` ${label} `;
+  return <Text bold inverse color="cyan">{text.padEnd(Math.max(width, text.length))}</Text>;
 }
