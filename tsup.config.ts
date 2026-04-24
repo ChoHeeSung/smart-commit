@@ -8,6 +8,9 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   dts: false,
+  loader: {
+    ".tsx": "tsx",
+  },
   banner: {
     js: "#!/usr/bin/env node",
   },

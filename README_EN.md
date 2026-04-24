@@ -7,6 +7,9 @@ AI-powered intelligent Git auto-commit & push CLI tool
 
 Scans all Git repositories under the current directory, lets AI (Gemini/Claude/GPT/Ollama) analyze your diffs and generate commit messages automatically. Dangerous files like `.env` are filtered out, and commit messages follow the Conventional Commits format.
 
+![smart-commit UI](asset/welcome.png)
+*Interactive terminal UI built with Ink (React-for-CLI)*
+
 ## Install & Run
 
 ```bash
@@ -47,7 +50,7 @@ No AI tool? It automatically switches to offline mode (template selection).
 - **Headless/CI Mode** — Non-interactive auto-commit/push
 - **Git Hooks** — Install/uninstall prepare-commit-msg & post-commit hooks
 - **MCP Server** — Use as MCP tools in Claude Code
-- **TUI** — terminal-kit based progress bar, tables, menus
+- **TUI** — Ink (React-for-CLI) dashboard with boxed panels, gradient banner, keyboard multi-select (automatic CJK alignment)
 - **Error Diagnosis** — Analyzes 13+ failure patterns with specific fix suggestions
 
 ## Usage
@@ -236,8 +239,12 @@ Use as MCP tools in Claude Code or similar:
 | [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) | Config file discovery |
 | [simple-git](https://github.com/steveukx/git-js) | Git operations |
 | [execa](https://github.com/sindresorhus/execa) | AI CLI subprocess |
-| [terminal-kit](https://github.com/cronvel/terminal-kit) | TUI (progress, tables, menus) |
-| [string-width](https://github.com/sindresorhus/string-width) | CJK-aware string width |
+| [ink](https://github.com/vadimdemedes/ink) | React-for-CLI renderer (TUI core) |
+| [ink-big-text](https://github.com/sindresorhus/ink-big-text) | ASCII block banner (header) |
+| [ink-gradient](https://github.com/sindresorhus/ink-gradient) | Banner gradient color |
+| [ink-spinner](https://github.com/vadimdemedes/ink-spinner) | Loading spinner |
+| [ink-select-input](https://github.com/vadimdemedes/ink-select-input) | Keyboard menu selection |
+| [ink-text-input](https://github.com/vadimdemedes/ink-text-input) | Text input prompt |
 | [minimatch](https://github.com/isaacs/minimatch) | Glob pattern matching |
 | [pino](https://github.com/pinojs/pino) | Structured logging |
 | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MCP server |
@@ -274,7 +281,11 @@ src/
 ├── ai-client.ts          AI calls (Gemini/Claude/GPT/Ollama) + validation
 ├── committer.ts          Commit/push + pull retry + error diagnosis
 ├── conflict-resolver.ts  Block-level AI conflict resolution
-├── ui.ts                 terminal-kit TUI + CJK alignment
+├── ui/                   Ink (React-for-CLI) TUI
+│   ├── index.tsx         createUI adapter
+│   ├── helpers.ts        Path/status display utilities
+│   └── components/       Header, ScanDashboard, RepoTable, RepoSelect,
+│                         CommitPreview, ActionMenu, Confirm, etc.
 ├── logger.ts             pino logging
 ├── types.ts              Type definitions
 └── hooks/install.ts      Git hook install/uninstall

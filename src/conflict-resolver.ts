@@ -2,7 +2,7 @@ import { simpleGit } from "simple-git";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AiClient } from "./ai-client.js";
-import type { UI } from "./ui.js";
+import type { UI } from "./ui/index.js";
 import type { Logger } from "pino";
 
 interface ConflictBlock {

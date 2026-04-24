@@ -2,7 +2,7 @@ import { simpleGit, type SimpleGit } from "simple-git";
 import { readdir, stat, access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { RepoState, RepoGitStatus, FileChange } from "./types.js";
-import type { UI } from "./ui.js";
+import type { UI } from "./ui/index.js";
 import type { Logger } from "pino";
 
 export async function scanRepositories(

@@ -7,6 +7,9 @@ AI 기반 지능형 Git 자동 커밋 & 푸시 CLI 도구
 
 현재 디렉토리 하위의 모든 Git 저장소를 한 번에 스캔하여, AI(Gemini/Claude/GPT/Ollama)가 diff를 분석하고 커밋 메시지를 자동 생성합니다. `.env` 같은 위험한 파일은 알아서 걸러주고, 커밋 메시지도 Conventional Commits 형식으로 깔끔하게 만들어줍니다.
 
+![smart-commit UI](asset/welcome.png)
+*Ink(React-for-CLI) 기반의 대화형 터미널 UI*
+
 ## 설치 & 실행
 
 ```bash
@@ -48,7 +51,7 @@ AI 도구가 없으면 자동으로 오프라인 모드(템플릿 선택)로 전
 - **Git Hook** — prepare-commit-msg / post-commit 훅 설치/제거
 - **MCP 서버** — Claude Code 등에서 MCP 도구로 사용 가능
 - **에러 진단** — 커밋/푸시 실패 시 13가지 에러 패턴 분석 + 해결 가이드 자동 출력
-- **TUI** — terminal-kit 기반 프로그레스바, 테이블, 메뉴 선택 (CJK 한글 정렬 지원)
+- **TUI** — Ink(React-for-CLI) 기반 대시보드 · 박스 패널 · 그라데이션 배너 · 키보드 멀티셀렉트 (CJK 한글 정렬 자동 지원)
 
 ## 사용법
 
@@ -250,8 +253,12 @@ Claude Code 등에서 MCP 도구로 사용할 수 있습니다.
 | [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) | 설정 파일 자동 탐색 |
 | [simple-git](https://github.com/steveukx/git-js) | Git 연동 |
 | [execa](https://github.com/sindresorhus/execa) | AI CLI 서브프로세스 호출 |
-| [terminal-kit](https://github.com/cronvel/terminal-kit) | TUI (프로그레스바, 테이블, 메뉴) |
-| [string-width](https://github.com/sindresorhus/string-width) | CJK 문자 터미널 너비 계산 |
+| [ink](https://github.com/vadimdemedes/ink) | React-for-CLI 렌더러 (TUI 핵심) |
+| [ink-big-text](https://github.com/sindresorhus/ink-big-text) | ASCII 블록 배너 (헤더) |
+| [ink-gradient](https://github.com/sindresorhus/ink-gradient) | 배너 그라데이션 색상 |
+| [ink-spinner](https://github.com/vadimdemedes/ink-spinner) | 로딩 스피너 |
+| [ink-select-input](https://github.com/vadimdemedes/ink-select-input) | 키보드 메뉴 선택 |
+| [ink-text-input](https://github.com/vadimdemedes/ink-text-input) | 텍스트 입력 프롬프트 |
 | [minimatch](https://github.com/isaacs/minimatch) | glob 패턴 매칭 (안전 필터) |
 | [pino](https://github.com/pinojs/pino) | 구조화 로깅 |
 | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MCP 서버 |
@@ -299,7 +306,11 @@ src/
 ├── ai-client.ts          AI 호출 (Gemini/Claude/GPT/Ollama) + 검증
 ├── committer.ts          커밋/푸시 + pull 재시도
 ├── conflict-resolver.ts  충돌 마커 단위 AI 해결
-├── ui.ts                 terminal-kit TUI
+├── ui/                   Ink(React-for-CLI) TUI
+│   ├── index.tsx         createUI 어댑터
+│   ├── helpers.ts        경로/상태 표현 유틸
+│   └── components/       Header, ScanDashboard, RepoTable, RepoSelect,
+│                         CommitPreview, ActionMenu, Confirm 등
 ├── logger.ts             pino 로깅
 ├── types.ts              타입 정의
 └── hooks/install.ts      Git Hook 설치/제거

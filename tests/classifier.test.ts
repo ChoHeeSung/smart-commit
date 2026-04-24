@@ -8,6 +8,10 @@ const config: SmartCommitConfig = {
     maxFileSize: "10MB",
     blockedPatterns: ["*.env", ".env.*", "*.pem", "*.key", "credentials*", "*.sqlite"],
     warnPatterns: ["*.log", "*.csv", "package-lock.json"],
+    lfsPrompt: false,
+    lfsAutoInstall: false,
+    lfsAutoTrack: false,
+    lfsTrackExtensions: [],
   },
   commit: { style: "conventional", language: "ko", maxDiffSize: 10000 },
   grouping: { strategy: "smart" },
@@ -22,7 +26,7 @@ describe("classifyFiles", () => {
     const files = [makeFile(".env"), makeFile("src/index.ts")];
     const result = await classifyFiles(files, config);
     expect(result.blocked).toHaveLength(1);
-    expect(result.blocked[0].path).toBe(".env");
+    expect(result.blocked[0].file.path).toBe(".env");
     expect(result.safe).toHaveLength(1);
   });
 
@@ -61,8 +65,11 @@ describe("classifyFiles", () => {
     const files = [makeFile("debug.log"), makeFile("src/app.ts")];
     const result = await classifyFiles(files, config);
     // *.log is in warnPatterns, but may also be in global gitignore (→ blocked)
-    const logFile = [...result.warned, ...result.blocked].find((f) => f.path === "debug.log");
-    expect(logFile).toBeDefined();
+    const allPaths = [
+      ...result.warned.map((f) => f.path),
+      ...result.blocked.map((b) => b.file.path),
+    ];
+    expect(allPaths).toContain("debug.log");
     expect(result.safe).toHaveLength(1);
   });
 

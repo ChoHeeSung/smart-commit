@@ -1,7 +1,7 @@
 import { simpleGit } from "simple-git";
 import { t } from "./i18n.js";
 import type { RepoState, FileChange, UserAction } from "./types.js";
-import type { UI } from "./ui.js";
+import type { UI } from "./ui/index.js";
 import type { Logger } from "pino";
 
 export async function commitAndPush(

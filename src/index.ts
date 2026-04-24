@@ -8,7 +8,7 @@ import { scanRepositories } from "./scanner.js";
 import { classifyFiles, groupFiles } from "./classifier.js";
 import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.js";
 import { commitAndPush } from "./committer.js";
-import { createUI, type UI } from "./ui.js";
+import { createUI, type UI } from "./ui/index.js";
 import { createLogger } from "./logger.js";
 import { t, setLocale, type Locale } from "./i18n.js";
 import type { RepoState, UserAction, FileChange, BlockedFile, SmartCommitConfig } from "./types.js";
