@@ -7,8 +7,8 @@ AI 기반 지능형 Git 자동 커밋 & 푸시 CLI 도구
 
 현재 디렉토리 하위의 모든 Git 저장소를 한 번에 스캔하여, AI(Gemini/Claude/GPT/Ollama)가 diff를 분석하고 커밋 메시지를 자동 생성합니다. `.env` 같은 위험한 파일은 알아서 걸러주고, 커밋 메시지도 Conventional Commits 형식으로 깔끔하게 만들어줍니다.
 
-![smart-commit UI](asset/welcome.png)
-*Ink(React-for-CLI) 기반의 대화형 터미널 UI*
+![smart-commit dashboard](asset/dashboard.png)
+*단일 화면 대시보드 — 좌측 저장소 목록 · 우측 커밋 프리뷰 + 실시간 로그 (Ink React-for-CLI 기반)*
 
 ## 설치 & 실행
 
@@ -51,7 +51,7 @@ AI 도구가 없으면 자동으로 오프라인 모드(템플릿 선택)로 전
 - **Git Hook** — prepare-commit-msg / post-commit 훅 설치/제거
 - **MCP 서버** — Claude Code 등에서 MCP 도구로 사용 가능
 - **에러 진단** — 커밋/푸시 실패 시 13가지 에러 패턴 분석 + 해결 가이드 자동 출력
-- **TUI** — Ink(React-for-CLI) 기반 대시보드 · 박스 패널 · 그라데이션 배너 · 키보드 멀티셀렉트 (CJK 한글 정렬 자동 지원)
+- **TUI 대시보드** — Ink(React-for-CLI) 기반 단일 페이지 레이아웃. 좌측 저장소 리스트(viewport 스크롤) · 우측 현재 커밋 프리뷰 + 실시간 로그 · 프롬프트는 하단 모달로 전환. `string-width` 기반 CJK(한글) 정확한 폭 계산
 
 ## 사용법
 
@@ -259,6 +259,7 @@ Claude Code 등에서 MCP 도구로 사용할 수 있습니다.
 | [ink-spinner](https://github.com/vadimdemedes/ink-spinner) | 로딩 스피너 |
 | [ink-select-input](https://github.com/vadimdemedes/ink-select-input) | 키보드 메뉴 선택 |
 | [ink-text-input](https://github.com/vadimdemedes/ink-text-input) | 텍스트 입력 프롬프트 |
+| [string-width](https://github.com/sindresorhus/string-width) | CJK·이모지 안전 표시폭 계산 |
 | [minimatch](https://github.com/isaacs/minimatch) | glob 패턴 매칭 (안전 필터) |
 | [pino](https://github.com/pinojs/pino) | 구조화 로깅 |
 | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MCP 서버 |
@@ -306,11 +307,14 @@ src/
 ├── ai-client.ts          AI 호출 (Gemini/Claude/GPT/Ollama) + 검증
 ├── committer.ts          커밋/푸시 + pull 재시도
 ├── conflict-resolver.ts  충돌 마커 단위 AI 해결
-├── ui/                   Ink(React-for-CLI) TUI
-│   ├── index.tsx         createUI 어댑터
+├── ui/                   Ink(React-for-CLI) 단일 페이지 대시보드
+│   ├── index.tsx         createUI 어댑터 (render 1회 + store action)
+│   ├── App.tsx           phase별 레이아웃 (idle/scanning/selecting/processing/done)
+│   ├── store.ts          useSyncExternalStore 기반 상태 스토어
 │   ├── helpers.ts        경로/상태 표현 유틸
-│   └── components/       Header, ScanDashboard, RepoTable, RepoSelect,
-│                         CommitPreview, ActionMenu, Confirm 등
+│   ├── width.ts          string-width 기반 CJK 안전 패딩/자르기
+│   ├── layout/           HeaderPanel · ScanView · RepoPane · ActivityPane · LogPane · FooterBar · ModalArea
+│   └── modals/           Confirm · ActionMenu · LfsExtSelect · OfflineTemplate · Input
 ├── logger.ts             pino 로깅
 ├── types.ts              타입 정의
 └── hooks/install.ts      Git Hook 설치/제거

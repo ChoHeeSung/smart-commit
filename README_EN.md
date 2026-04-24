@@ -7,8 +7,8 @@ AI-powered intelligent Git auto-commit & push CLI tool
 
 Scans all Git repositories under the current directory, lets AI (Gemini/Claude/GPT/Ollama) analyze your diffs and generate commit messages automatically. Dangerous files like `.env` are filtered out, and commit messages follow the Conventional Commits format.
 
-![smart-commit UI](asset/welcome.png)
-*Interactive terminal UI built with Ink (React-for-CLI)*
+![smart-commit dashboard](asset/dashboard.png)
+*Single-screen dashboard — left pane: repositories · right pane: current commit preview + live log (built with Ink, React-for-CLI)*
 
 ## Install & Run
 
@@ -50,7 +50,7 @@ No AI tool? It automatically switches to offline mode (template selection).
 - **Headless/CI Mode** — Non-interactive auto-commit/push
 - **Git Hooks** — Install/uninstall prepare-commit-msg & post-commit hooks
 - **MCP Server** — Use as MCP tools in Claude Code
-- **TUI** — Ink (React-for-CLI) dashboard with boxed panels, gradient banner, keyboard multi-select (automatic CJK alignment)
+- **TUI dashboard** — Single-page Ink (React-for-CLI) layout. Left pane: repo list with viewport scroll. Right pane: current commit preview + live log. Prompts render as bottom modals. Accurate CJK (Korean/Chinese/Japanese) column widths via `string-width`.
 - **Error Diagnosis** — Analyzes 13+ failure patterns with specific fix suggestions
 
 ## Usage
@@ -245,6 +245,7 @@ Use as MCP tools in Claude Code or similar:
 | [ink-spinner](https://github.com/vadimdemedes/ink-spinner) | Loading spinner |
 | [ink-select-input](https://github.com/vadimdemedes/ink-select-input) | Keyboard menu selection |
 | [ink-text-input](https://github.com/vadimdemedes/ink-text-input) | Text input prompt |
+| [string-width](https://github.com/sindresorhus/string-width) | CJK/emoji display width |
 | [minimatch](https://github.com/isaacs/minimatch) | Glob pattern matching |
 | [pino](https://github.com/pinojs/pino) | Structured logging |
 | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) | MCP server |
@@ -281,11 +282,14 @@ src/
 ├── ai-client.ts          AI calls (Gemini/Claude/GPT/Ollama) + validation
 ├── committer.ts          Commit/push + pull retry + error diagnosis
 ├── conflict-resolver.ts  Block-level AI conflict resolution
-├── ui/                   Ink (React-for-CLI) TUI
-│   ├── index.tsx         createUI adapter
+├── ui/                   Ink (React-for-CLI) single-page dashboard
+│   ├── index.tsx         createUI adapter (render once + store actions)
+│   ├── App.tsx           Phase-based layout (idle/scanning/selecting/processing/done)
+│   ├── store.ts          useSyncExternalStore-based state store
 │   ├── helpers.ts        Path/status display utilities
-│   └── components/       Header, ScanDashboard, RepoTable, RepoSelect,
-│                         CommitPreview, ActionMenu, Confirm, etc.
+│   ├── width.ts          string-width-based CJK-safe padding/truncation
+│   ├── layout/           HeaderPanel · ScanView · RepoPane · ActivityPane · LogPane · FooterBar · ModalArea
+│   └── modals/           Confirm · ActionMenu · LfsExtSelect · OfflineTemplate · Input
 ├── logger.ts             pino logging
 ├── types.ts              Type definitions
 └── hooks/install.ts      Git hook install/uninstall

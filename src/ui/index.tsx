@@ -1,4 +1,3 @@
-import type { ReactElement } from "react";
 import { render } from "ink";
 import type {
   RepoState,
@@ -8,22 +7,9 @@ import type {
   UserAction,
   LfsInstallPlan,
 } from "../types.js";
-import { Header } from "./components/Header.js";
-import { ScanDashboard } from "./components/ScanDashboard.js";
-import { RepoTable } from "./components/RepoTable.js";
-import { RepoSelect } from "./components/RepoSelect.js";
-import { Blocked } from "./components/Blocked.js";
-import { ConfirmWarned } from "./components/ConfirmWarned.js";
-import { LfsInit } from "./components/LfsInit.js";
-import { LfsInstall } from "./components/LfsInstall.js";
-import { LfsExtSelect } from "./components/LfsExtSelect.js";
-import { CommitPreview } from "./components/CommitPreview.js";
-import { ActionMenu } from "./components/ActionMenu.js";
-import { OfflineTemplate } from "./components/OfflineTemplate.js";
-import { Input } from "./components/Input.js";
-import { Message } from "./components/Message.js";
-import { Spinner } from "./components/Spinner.js";
-import { Complete } from "./components/Complete.js";
+import { App } from "./App.js";
+import { store } from "./store.js";
+import { t } from "../i18n.js";
 
 export interface UI {
   showHeader(config: SmartCommitConfig, version?: string): void;
@@ -47,126 +33,136 @@ export interface UI {
 
 type RenderInstance = ReturnType<typeof render>;
 
-/** Render once; Ink commits synchronously so final output stays in scrollback after unmount. */
-function renderStatic(element: ReactElement): void {
-  const instance = render(element);
-  instance.unmount();
-}
-
-/** Render an interactive component; component calls onSubmit, we unmount and resolve. */
-function renderPrompt<T>(
-  build: (onSubmit: (value: T) => void) => ReactElement,
-): Promise<T> {
-  return new Promise<T>((resolve) => {
-    let instance: RenderInstance | null = null;
-    const submit = (value: T) => {
-      instance?.unmount();
-      resolve(value);
-    };
-    instance = render(build(submit));
-  });
-}
-
 export function createUI(): UI {
-  let progress: RenderInstance | null = null;
-  let spinner: RenderInstance | null = null;
+  let appInstance: RenderInstance | null = null;
+
+  function ensureApp(): void {
+    if (appInstance) return;
+    process.stdout.write("\x1b[2J\x1b[3J\x1b[H");
+    appInstance = render(<App />, {
+      exitOnCtrlC: false,
+      patchConsole: false,
+    });
+  }
 
   return {
     showHeader(config, version) {
-      renderStatic(<Header config={config} version={version ?? "unknown"} />);
+      store.setHeader(config, version ?? "unknown");
+      ensureApp();
     },
 
     showProgress(label, current, total) {
-      const node = <ScanDashboard label={label} current={current} total={total} />;
-      if (!progress) progress = render(node);
-      else progress.rerender(node);
+      store.setScanProgress({ label, current, total });
       if (current >= total) {
-        progress.unmount();
-        progress = null;
+        // end of scanning — phase will move to processing when repos arrive
+        store.setScanProgress(null);
       }
     },
 
     showRepoTable(repos) {
-      renderStatic(<RepoTable repos={repos} />);
+      store.setRepos(repos);
     },
 
     selectRepos(repos) {
       const dirty = repos.filter((r) => r.status === "dirty");
       if (dirty.length === 0) return Promise.resolve([]);
       if (dirty.length === 1) return Promise.resolve(dirty);
-      return renderPrompt<RepoState[]>((onSubmit) => (
-        <RepoSelect repos={dirty} onSubmit={onSubmit} />
-      ));
+      return new Promise<RepoState[]>((resolve) => {
+        store.openRepoSelect(repos, resolve);
+      });
     },
 
     showBlocked(repo, files) {
-      renderStatic(<Blocked repo={repo} files={files} />);
+      store.setBlocked({ repoPath: repo.path, files });
+      store.appendLog("error", `${repo.path}: ${files.length} blocked files`);
     },
 
     confirmWarned(repo, files) {
-      return renderPrompt<boolean>((onSubmit) => (
-        <ConfirmWarned repo={repo} files={files} onSubmit={onSubmit} />
-      ));
+      return new Promise<boolean>((resolve) => {
+        store.openModal({
+          type: "confirm-warned",
+          repo, files,
+          resolve: (yes) => { store.closeModal(); resolve(yes); },
+        });
+      });
     },
 
     confirmLfsInit(repo) {
-      return renderPrompt<boolean>((onSubmit) => (
-        <LfsInit repo={repo} onSubmit={onSubmit} />
-      ));
+      return new Promise<boolean>((resolve) => {
+        store.openModal({
+          type: "lfs-init", repo,
+          resolve: (yes) => { store.closeModal(); resolve(yes); },
+        });
+      });
     },
 
     selectLfsExtensions(extensions) {
       if (extensions.length === 0) return Promise.resolve([]);
-      return renderPrompt<string[]>((onSubmit) => (
-        <LfsExtSelect extensions={extensions} onSubmit={onSubmit} />
-      ));
+      return new Promise<string[]>((resolve) => {
+        store.openModal({
+          type: "lfs-ext-select", extensions,
+          resolve: (picked) => { store.closeModal(); resolve(picked); },
+        });
+      });
     },
 
     confirmLfsInstall(plan) {
-      return renderPrompt<boolean>((onSubmit) => (
-        <LfsInstall plan={plan} onSubmit={onSubmit} />
-      ));
+      return new Promise<boolean>((resolve) => {
+        store.openModal({
+          type: "lfs-install", plan,
+          resolve: (yes) => { store.closeModal(); resolve(yes); },
+        });
+      });
     },
 
     showCommitPreview(repo, message, files) {
-      renderStatic(<CommitPreview repo={repo} message={message} files={files} />);
+      store.setActivity({ repoPath: repo.path, message, files });
+      store.setBlocked(null);
     },
 
     promptAction() {
-      return renderPrompt<UserAction>((onSubmit) => (
-        <ActionMenu onSubmit={onSubmit} />
-      ));
+      return new Promise<UserAction>((resolve) => {
+        store.openModal({
+          type: "action-menu",
+          resolve: (action) => { store.closeModal(); resolve(action); },
+        });
+      });
     },
 
     promptOfflineTemplate(templates) {
-      return renderPrompt<string>((onSubmit) => (
-        <OfflineTemplate templates={templates} onSubmit={onSubmit} />
-      ));
+      return new Promise<string>((resolve) => {
+        store.openModal({
+          type: "offline-template", templates,
+          resolve: (msg) => { store.closeModal(); resolve(msg); },
+        });
+      });
     },
 
     promptInput(label) {
-      return renderPrompt<string>((onSubmit) => (
-        <Input label={label} onSubmit={onSubmit} />
-      ));
+      return new Promise<string>((resolve) => {
+        store.openModal({
+          type: "input", label,
+          resolve: (text) => { store.closeModal(); resolve(text); },
+        });
+      });
     },
 
     showMessage(msg, level) {
-      renderStatic(<Message message={msg} level={level} />);
+      store.appendLog(level, msg);
     },
 
     showSpinner(label) {
-      spinner = render(<Spinner label={label} />);
-      return () => {
-        spinner?.unmount();
-        spinner = null;
-      };
+      store.setSpinner(label);
+      return () => store.setSpinner(null);
     },
 
     showComplete() {
-      renderStatic(<Complete />);
+      store.setPhase("done");
+      store.appendLog("success", t().allComplete);
     },
 
     cleanup() {
+      appInstance?.unmount();
       process.exit(0);
     },
   };
