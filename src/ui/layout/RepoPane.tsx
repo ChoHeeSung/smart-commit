@@ -22,11 +22,11 @@ const MIN_REPO = 18;
 const MIN_BRANCH = 6;
 const MIN_CHANGES = 6;
 
-// Heading bar(1) + repo count + showing line(최대 1) + up-more(최대 1) + down-more(최대 1)
-const CHROME_ROWS = 4;
+// heading 1 + 목록 + 하단 more 1 → chrome 2 줄
+const CHROME_ROWS = 2;
 
 function computeLayout(columns: number, contentHeight: number): Layout {
-  const paneInner = Math.max(30, Math.floor(columns / 2) - 2); // paddingRight 2 감안
+  const paneInner = Math.max(30, Math.floor(columns / 2) - 2);
   const available = Math.max(MIN_REPO + MIN_BRANCH + MIN_CHANGES, paneInner - PREFIX);
   const colRepo = Math.max(MIN_REPO, Math.floor(available * 0.55));
   const colBranch = Math.max(MIN_BRANCH, Math.floor(available * 0.22));
@@ -51,17 +51,19 @@ export function RepoPane({ contentHeight }: Props) {
   const above = viewStart;
   const below = repos.length - end;
   const currentPath = activity?.repoPath ?? null;
+  const paneWidth = Math.max(40, Math.floor(columns / 2) - 2);
 
-  const paneWidth = Math.floor(columns / 2) - 2;
+  // heading 에 스크롤 상태까지 **한 줄로 고정** 렌더 → Ink rerender 시 자식 수
+  // 변동 없음 → 덮어쓰기 버그 회피. 위/아래 more 지시자를 별도 row 로 두지 않음.
+  const showingInfo =
+    repos.length > layout.viewport
+      ? `${viewStart + 1}-${end}/${repos.length} ↑${above} ↓${below}`
+      : `${repos.length}`;
+  const hint = `${repos.length} · ${dirty} changed · ${showingInfo}`;
 
   return (
     <Box flexDirection="column">
-      <HeadingBar
-        width={paneWidth}
-        label="REPOS"
-        hint={`${repos.length} · ${dirty} changed  ·  Showing ${viewStart + 1}-${end} of ${repos.length}`}
-      />
-      {above > 0 ? <Text dimColor>   ^ {above} more</Text> : <Text> </Text>}
+      <HeadingBar width={paneWidth} label="REPOS" hint={hint} />
       {visible.map((repo, i) => {
         const globalIdx = viewStart + i;
         return (
@@ -76,19 +78,18 @@ export function RepoPane({ contentHeight }: Props) {
           />
         );
       })}
-      {below > 0 ? <Text dimColor>   v {below} more</Text> : <Text> </Text>}
     </Box>
   );
 }
 
 function HeadingBar({ width, label, hint }: { width: number; label: string; hint: string }) {
-  const line = ` ${label} `;
-  const suffix = ` ${hint} `;
-  const fill = Math.max(0, width - line.length - suffix.length);
+  const head = ` ${label} `;
+  const info = ` ${hint} `;
+  const fill = Math.max(0, width - head.length - info.length);
   return (
     <Text>
-      <Text bold inverse color="cyan">{line}</Text>
-      <Text dimColor>{suffix}{" ".repeat(fill)}</Text>
+      <Text bold inverse color="cyan">{head}</Text>
+      <Text dimColor>{info}{" ".repeat(fill)}</Text>
     </Text>
   );
 }
