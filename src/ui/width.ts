@@ -22,9 +22,11 @@ export function cwTruncate(s: string, maxCols: number): string {
   if (maxCols <= 0) return "";
   if (displayWidth(s) <= maxCols) return s;
 
-  const ellipsis = "…";
-  const budget = maxCols - displayWidth(ellipsis);
-  if (budget <= 0) return ellipsis.slice(0, 1);
+  // ASCII ".." — East Asian Ambiguous인 "…"을 쓰면 터미널/locale 조합에 따라
+  // 1~2 cols로 갈려 정렬이 어긋남. ASCII 2 chars는 어느 환경에서든 2 cols 고정.
+  const ellipsis = "..";
+  const budget = maxCols - 2;
+  if (budget <= 0) return ellipsis.slice(0, maxCols);
 
   let out = "";
   let used = 0;
