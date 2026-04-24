@@ -7,10 +7,12 @@ import { ActivityPane } from "./layout/ActivityPane.js";
 import { LogPane } from "./layout/LogPane.js";
 import { FooterBar } from "./layout/FooterBar.js";
 import { ModalArea } from "./layout/ModalArea.js";
+import { useTerminalSize } from "./useTerminalSize.js";
 
 export function App() {
   const phase = useUi((s) => s.phase);
   const modal = useUi((s) => s.modal);
+  const { rows } = useTerminalSize();
 
   const inputActive = phase === "selecting" && !modal;
   useInput((input, key) => {
@@ -24,19 +26,21 @@ export function App() {
     if (key.escape || input === "q") return store.cancelRepoSelection();
   }, { isActive: inputActive });
 
-  const rows = Math.max(30, process.stdout.rows ?? 40);
+  const appHeight = Math.max(20, rows - 1);
+  const inPairLayout = phase !== "idle" && phase !== "scanning";
 
   return (
-    <Box flexDirection="column" height={rows}>
+    <Box flexDirection="column" height={appHeight}>
       <HeaderPanel />
       {phase === "scanning" && <ScanView />}
-      {phase !== "idle" && phase !== "scanning" && (
-        <Box flexDirection="row">
+      {inPairLayout && (
+        <Box flexDirection="row" flexGrow={1} overflow="hidden">
           <Box
             width="50%"
             borderStyle="round"
             borderColor="cyan"
             flexDirection="column"
+            overflow="hidden"
           >
             <RepoPane />
           </Box>
@@ -45,6 +49,7 @@ export function App() {
             borderStyle="round"
             borderColor="cyan"
             flexDirection="column"
+            overflow="hidden"
           >
             <ActivityPane />
             <LogPane />

@@ -12,19 +12,28 @@ interface Layout {
   colChanges: number;
 }
 
-const PREFIX_CHARS = 5; // " X X "
-const MIN_REPO = 16;
-const MIN_BRANCH = 6;
-const MIN_CHANGES = 6;
-const VERT_CHROME = 12; // header/footer/border/헤더정보 등 가로줄 점유량
+// Prefix 구조 (모두 ASCII 고정폭):
+//   " "         1  좌측 여백
+//   "cursor"    1  focused=">" / unfocused=" "
+//   " "         1
+//   "[x]"       3  checkbox (selectable & checked="[x]", unchecked="[ ]", unselectable="   ")
+//   " "         1
+// 총 7 chars
+const PREFIX_CHARS = 7;
+const MIN_REPO = 18;
+const MIN_BRANCH = 7;
+const MIN_CHANGES = 7;
 
-function computeLayout(columns: number, rows: number): Layout {
-  const paneInner = Math.max(30, Math.floor(columns / 2) - 4); // 좌측 50% 중 border/padding 제외
+// 상단 타이틀 2줄 + (선택적) showing 1줄 + (선택적) 위아래 "more" 2줄 → 최대 5줄
+const HEADER_ROWS = 5;
+
+function computeLayout(columns: number, paneHeight: number): Layout {
+  const paneInner = Math.max(30, Math.floor(columns / 2) - 4);
   const available = Math.max(MIN_REPO + MIN_BRANCH + MIN_CHANGES, paneInner - PREFIX_CHARS);
   const colRepo = Math.max(MIN_REPO, Math.floor(available * 0.55));
   const colBranch = Math.max(MIN_BRANCH, Math.floor(available * 0.22));
   const colChanges = Math.max(MIN_CHANGES, available - colRepo - colBranch);
-  const viewport = Math.max(6, rows - VERT_CHROME);
+  const viewport = Math.max(4, paneHeight - HEADER_ROWS);
   return { viewport, colRepo, colBranch, colChanges };
 }
 
@@ -35,7 +44,10 @@ export function RepoPane() {
   const selection = useUi((s) => s.selection);
   const activity = useUi((s) => s.activity);
   const { columns, rows } = useTerminalSize();
-  const layout = computeLayout(columns, rows);
+
+  // App height = rows - 1, header panel ~ 7줄, footer ~ 2줄, 박스 border ~ 2줄
+  const paneHeight = Math.max(10, rows - 12);
+  const layout = computeLayout(columns, paneHeight);
 
   const dirtyCount = repos.filter((r) => r.status === "dirty").length;
   const viewStart = computeViewStart(cursor, repos.length, layout.viewport);
@@ -47,10 +59,7 @@ export function RepoPane() {
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold>
-        <Text color="cyan">Repos</Text>
-        <Text dimColor> ({repos.length} · {dirtyCount} changed)</Text>
-      </Text>
+      <Text bold color="cyan">Repos <Text dimColor>({repos.length} · {dirtyCount} changed)</Text></Text>
       {repos.length > layout.viewport && (
         <Text dimColor>Showing {viewStart + 1}-{end} of {repos.length}</Text>
       )}
@@ -85,26 +94,23 @@ interface RowProps {
 
 function RepoRow({ repo, focused, checked, active, phase, layout }: RowProps) {
   const cursor = focused ? ">" : " ";
-  const mark = selectMarker(repo, checked, active, phase);
-  const remoteTag = repo.hasRemote ? " " : "*";
-  const repoName = shortRepoPath(repo.path) + " " + remoteTag;
+  const checkbox = renderCheckbox(repo, checked, phase);
+  const repoName = shortRepoPath(repo.path) + (repo.hasRemote ? "" : " [local]");
   const line =
-    ` ${cursor} ${mark} ` +
+    ` ${cursor} ${checkbox} ` +
     cellPad(repoName, layout.colRepo) +
     cellPad(repo.branch, layout.colBranch) +
     cellPad(changeText(repo), layout.colChanges);
-  const color = rowColor(repo, focused, checked, active, phase);
-  const dim = !focused && !active && !checked && repo.status !== "dirty";
-  return <Text color={color} dimColor={dim}>{line}</Text>;
+  const { color, dim, inverse } = rowStyle(repo, focused, checked, active, phase);
+  return <Text color={color} dimColor={dim} inverse={inverse}>{line}</Text>;
 }
 
-function selectMarker(
-  repo: RepoState, checked: boolean, active: boolean, phase: string,
-): string {
-  if (active) return "@";
-  if (phase === "selecting" && repo.status === "dirty") return checked ? "x" : "o";
-  if (repo.status === "dirty") return "*";
-  return ".";
+function renderCheckbox(repo: RepoState, checked: boolean, phase: string): string {
+  if (phase === "selecting" && repo.status === "dirty") {
+    return checked ? "[x]" : "[ ]";
+  }
+  if (repo.status === "dirty") return "[*]";
+  return "   ";
 }
 
 function changeText(repo: RepoState): string {
@@ -113,14 +119,20 @@ function changeText(repo: RepoState): string {
   return "-";
 }
 
-function rowColor(
+interface Style {
+  color: "cyan" | "yellow" | "green" | undefined;
+  dim: boolean;
+  inverse: boolean;
+}
+
+function rowStyle(
   repo: RepoState, focused: boolean, checked: boolean, active: boolean, phase: string,
-): "cyan" | "yellow" | "green" | undefined {
-  if (focused) return "cyan";
-  if (active) return "green";
-  if (checked && phase === "selecting") return "yellow";
-  if (repo.status === "dirty") return "yellow";
-  return undefined;
+): Style {
+  if (active) return { color: "green", dim: false, inverse: true };
+  if (focused) return { color: "cyan", dim: false, inverse: false };
+  if (phase === "selecting" && checked) return { color: "yellow", dim: false, inverse: false };
+  if (repo.status === "dirty") return { color: "yellow", dim: false, inverse: false };
+  return { color: undefined, dim: true, inverse: false };
 }
 
 function computeViewStart(cursorIdx: number, total: number, viewport: number): number {
