@@ -12,7 +12,8 @@ import { useTerminalSize } from "./useTerminalSize.js";
 // 레이아웃 규격 (heading bar + content 기반, 박스 테두리 없음).
 // 박스 테두리는 Ink + 넓은 터미널에서 overflow 관리에 부작용이 있어 전면 제거.
 const HEADER_ROWS = 7;   // banner(5) + meta(1) + blank(1)
-const FOOTER_ROWS = 3;   // border(2) + hint(1)
+const FOOTER_ROWS_SLIM = 3;   // FooterBar: border(2) + hint(1)
+const FOOTER_ROWS_MODAL = 10; // Modal heading 1 + content 최대 (confirm 8 / action 6 / select 8)
 
 export function App() {
   const phase = useUi((s) => s.phase);
@@ -32,7 +33,8 @@ export function App() {
   }, { isActive: inputActive });
 
   const appHeight = Math.max(20, rows - 1);
-  const mainHeight = Math.max(8, appHeight - HEADER_ROWS - FOOTER_ROWS);
+  const footerArea = modal ? FOOTER_ROWS_MODAL : FOOTER_ROWS_SLIM;
+  const mainHeight = Math.max(8, appHeight - HEADER_ROWS - footerArea);
   const inPairLayout = phase !== "idle" && phase !== "scanning";
 
   return (

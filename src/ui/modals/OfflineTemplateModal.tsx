@@ -21,6 +21,7 @@ export function OfflineTemplateModal({ templates, onSubmit }: Props) {
         <Text color="yellow" bold>⚠ {m.offlineSelect}</Text>
         <SelectInput
           items={items}
+          limit={6}
           onSelect={(item) => { setPicked(item.value); setInput(item.value); }}
         />
       </Box>

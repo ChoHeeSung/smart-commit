@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import type { Modal } from "../store.js";
+// Text 는 위 줄의 heading bar 용으로 사용.
 import { ConfirmModal } from "../modals/ConfirmModal.js";
 import { ActionMenuModal } from "../modals/ActionMenuModal.js";
 import { LfsExtSelectModal } from "../modals/LfsExtSelectModal.js";
@@ -13,9 +14,14 @@ interface Props {
 }
 
 export function ModalArea({ modal }: Props) {
+  // heading bar (inverse magenta) + content, border/padding 없이 컴팩트하게.
+  // border 를 쓰면 모달이 필요한 rows 가 커져 App 하단 overflow 원인.
   return (
-    <Box borderStyle="double" borderColor="magenta" paddingX={1} flexDirection="column">
-      {renderModal(modal)}
+    <Box flexDirection="column">
+      <Text bold inverse color="magenta">{" MODAL ".padEnd(12)}</Text>
+      <Box paddingLeft={1} flexDirection="column">
+        {renderModal(modal)}
+      </Box>
     </Box>
   );
 }
