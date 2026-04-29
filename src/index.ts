@@ -6,12 +6,14 @@ const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json");
 import { scanRepositories } from "./scanner.js";
 import { classifyFiles, groupFiles } from "./classifier.js";
-import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.js";
-import { commitAndPush } from "./committer.js";
+import { createAiClient, isAiAvailable, getOfflineTemplates, type AiClient } from "./ai-client.js";
+import { commitGroup, pushRepo } from "./committer.js";
+import type { Logger } from "pino";
+import type { CommitGroup } from "./types.js";
 import { createUI, type UI } from "./ui/index.js";
 import { createLogger } from "./logger.js";
 import { t, setLocale, type Locale } from "./i18n.js";
-import type { RepoState, UserAction, FileChange, BlockedFile, SmartCommitConfig } from "./types.js";
+import type { RepoState, GroupAction, PushAction, FileChange, BlockedFile, SmartCommitConfig } from "./types.js";
 import {
   detectOs,
   detectPackageManager,
@@ -88,25 +90,12 @@ program
 
     for (const repo of repos) {
       if (repo.status !== "dirty") {
-        // Handle unpushed commits
+        // Clean repo with only unpushed commits — offer push
         if (repo.status === "clean" && repo.unpushedCommits > 0) {
-          if (!repo.hasRemote) {
-            ui.showMessage(`${repo.path}: ${t().noRemoteSkipPush}`, "info");
-          } else {
-            ui.showMessage(`${repo.path}: ${t().unpushedFound(repo.unpushedCommits)}`, "info");
-            if (options.dryRun) {
-              ui.showMessage(t().dryRunSkipPush, "info");
-            } else if (!isHeadless) {
-              const action = await ui.promptAction();
-              if (action === "exit") {
-                ui.showMessage(t().exiting, "info");
-                ui.cleanup();
-                return;
-              }
-              if (action === "push") {
-                await commitAndPush(repo, [], "", "push", ui, logger);
-              }
-            }
+          const exit = await handleUnpushedOnly(repo, ui, logger, options.dryRun ?? false, isHeadless);
+          if (exit) {
+            ui.cleanup();
+            return;
           }
         }
         continue;
@@ -127,7 +116,6 @@ program
         const lfsAccepted = await handleLfsOption(repo, sizeBlocked, config, ui, isHeadless);
         if (lfsAccepted.promoted.length > 0) {
           safety.safe.push(...lfsAccepted.promoted);
-          // Remove promoted files from blocked list
           safety.blocked = safety.blocked.filter(
             (b) => !lfsAccepted.promoted.some((p) => p.path === b.file.path),
           );
@@ -153,7 +141,6 @@ program
         continue;
       }
 
-      // Group files (skip AI grouping in offline mode)
       const groups = await groupFiles(
         safety.safe,
         offlineMode ? "single" : config.grouping.strategy,
@@ -163,39 +150,16 @@ program
         logger,
       );
 
+      // ── Phase 1: commit all groups (no push) ──
+      let commitsCreated = 0;
+      let exitRequested = false;
+      let skipRepo = false;
+
       for (const group of groups) {
-        let commitMsg: string | null = null;
-
-        if (offlineMode) {
-          // Offline mode: use template
-          if (isHeadless) {
-            commitMsg = `chore: auto-commit ${group.files.length} files`;
-          } else {
-            commitMsg = await ui.promptOfflineTemplate(getOfflineTemplates());
-          }
-        } else {
-          // AI mode
-          const stopSpinner = ui.showSpinner(t().aiGenerating);
-          const diff = await getDiff(repo, group.files);
-          const summarizedDiff = await ai.summarizeDiff(diff);
-          commitMsg = await ai.generateCommitMessage(summarizedDiff, config.commit.language);
-          stopSpinner();
-
-          if (!commitMsg) {
-            ui.showMessage(`${repo.path} [${group.label}]: ${t().aiFailed}`, "warn");
-            if (!isHeadless) {
-              ui.showMessage(t().offlineSwitch, "info");
-              commitMsg = await ui.promptOfflineTemplate(getOfflineTemplates());
-            } else {
-              commitMsg = `chore: auto-commit ${group.files.length} files`;
-            }
-          }
-        }
-
+        const commitMsg = await resolveCommitMessage(repo, group, ai, ui, config.commit.language, offlineMode, isHeadless);
         if (!commitMsg) continue;
 
         ui.showCommitPreview(repo, commitMsg, group.files);
-
         if (group.reason) {
           ui.showMessage(`  ${t().aiGroupReason}: ${group.reason}`, "info");
         }
@@ -205,28 +169,56 @@ program
           continue;
         }
 
-        // No remote: commit only (skip push)
-        let action: UserAction;
-        if (!repo.hasRemote) {
-          ui.showMessage(t().noRemoteCommitOnly, "info");
-          action = "skip"; // commit + keep local (no push)
-        } else {
-          action = isHeadless ? "push" : await ui.promptAction();
-        }
+        const action: GroupAction = isHeadless ? "commit" : await ui.promptGroupAction();
 
         if (action === "exit") {
-          ui.showMessage(t().exiting, "info");
-          ui.cleanup();
-          return;
+          exitRequested = true;
+          break;
         }
-
         if (action === "skip-repo") {
           ui.showMessage(`${repo.path}: ${t().skipRepo}`, "info");
-          break; // break out of groups loop, continue to next repo
+          skipRepo = true;
+          break;
         }
+        if (action === "skip-group") continue;
 
-        await commitAndPush(repo, group.files, commitMsg, action, ui, logger);
+        const ok = await commitGroup(repo, group.files, commitMsg, ui, logger);
+        if (ok) commitsCreated++;
       }
+
+      if (exitRequested) {
+        ui.showMessage(t().exiting, "info");
+        ui.cleanup();
+        return;
+      }
+
+      // ── Phase 2: push once per repo ──
+      if (skipRepo) continue;
+      if (options.dryRun) continue;
+      if (commitsCreated === 0) continue;
+      if (!repo.hasRemote) {
+        ui.showMessage(`${repo.path}: ${t().noRemoteSkipPush}`, "info");
+        continue;
+      }
+
+      const totalPending = commitsCreated + repo.unpushedCommits;
+
+      if (isHeadless) {
+        await pushRepo(repo, ui, logger);
+        continue;
+      }
+
+      const pushAction: PushAction = await ui.promptPushAction(totalPending);
+      if (pushAction === "exit") {
+        ui.showMessage(t().exiting, "info");
+        ui.cleanup();
+        return;
+      }
+      if (pushAction === "keep-local") {
+        ui.showMessage(`${repo.path}: ${t().localCommitKept}`, "info");
+        continue;
+      }
+      await pushRepo(repo, ui, logger);
     }
 
     ui.showComplete();
@@ -262,6 +254,74 @@ program
 
     ui.cleanup();
   });
+
+// Returns true if user requested exit.
+async function handleUnpushedOnly(
+  repo: RepoState,
+  ui: UI,
+  logger: Logger,
+  dryRun: boolean,
+  isHeadless: boolean,
+): Promise<boolean> {
+  if (!repo.hasRemote) {
+    ui.showMessage(`${repo.path}: ${t().noRemoteSkipPush}`, "info");
+    return false;
+  }
+
+  ui.showMessage(`${repo.path}: ${t().unpushedFound(repo.unpushedCommits)}`, "info");
+
+  if (dryRun) {
+    ui.showMessage(t().dryRunSkipPush, "info");
+    return false;
+  }
+
+  if (isHeadless) {
+    await pushRepo(repo, ui, logger);
+    return false;
+  }
+
+  const action = await ui.promptPushAction(repo.unpushedCommits);
+  if (action === "exit") {
+    ui.showMessage(t().exiting, "info");
+    return true;
+  }
+  if (action === "keep-local") {
+    ui.showMessage(`${repo.path}: ${t().localCommitKept}`, "info");
+    return false;
+  }
+  await pushRepo(repo, ui, logger);
+  return false;
+}
+
+async function resolveCommitMessage(
+  repo: RepoState,
+  group: CommitGroup,
+  ai: AiClient,
+  ui: UI,
+  language: string,
+  offlineMode: boolean,
+  isHeadless: boolean,
+): Promise<string | null> {
+  if (offlineMode) {
+    if (isHeadless) return `chore: auto-commit ${group.files.length} files`;
+    return await ui.promptOfflineTemplate(getOfflineTemplates());
+  }
+
+  const stopSpinner = ui.showSpinner(t().aiGenerating);
+  const diff = await getDiff(repo, group.files);
+  const summarizedDiff = await ai.summarizeDiff(diff);
+  let message = await ai.generateCommitMessage(summarizedDiff, language);
+  stopSpinner();
+
+  if (message) return message;
+
+  ui.showMessage(`${repo.path} [${group.label}]: ${t().aiFailed}`, "warn");
+  if (isHeadless) return `chore: auto-commit ${group.files.length} files`;
+
+  ui.showMessage(t().offlineSwitch, "info");
+  message = await ui.promptOfflineTemplate(getOfflineTemplates());
+  return message;
+}
 
 interface LfsAcceptResult {
   promoted: FileChange[];

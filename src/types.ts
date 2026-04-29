@@ -105,4 +105,5 @@ export interface LfsInstallPlan {
   needsSudo: boolean;
 }
 
-export type UserAction = "push" | "skip" | "cancel" | "edit" | "skip-repo" | "exit";
+export type GroupAction = "commit" | "skip-group" | "skip-repo" | "exit";
+export type PushAction = "push" | "keep-local" | "exit";

@@ -1,30 +1,18 @@
-import { simpleGit } from "simple-git";
+import { simpleGit, type SimpleGit } from "simple-git";
 import { t } from "./i18n.js";
-import type { RepoState, FileChange, UserAction } from "./types.js";
+import type { RepoState, FileChange } from "./types.js";
 import type { UI } from "./ui/index.js";
 import type { Logger } from "pino";
 
-export async function commitAndPush(
+export async function commitGroup(
   repo: RepoState,
   files: FileChange[],
   message: string,
-  action: UserAction,
   ui: UI,
   logger: Logger,
-): Promise<void> {
+): Promise<boolean> {
   const git = simpleGit(repo.path);
 
-  if (action === "cancel") {
-    ui.showMessage(`${repo.path}: ${t().skipping}`, "info");
-    return;
-  }
-
-  if (action === "edit") {
-    ui.showMessage("메시지 편집은 추후 지원 예정입니다.", "info");
-    return;
-  }
-
-  // Stage only safe files (skip gitignored)
   const staged: string[] = [];
   for (const f of files) {
     try {
@@ -43,43 +31,32 @@ export async function commitAndPush(
 
   if (staged.length === 0) {
     ui.showMessage(`${repo.path}: ${t().noStagedFiles}`, "warn");
-    return;
+    return false;
   }
 
   logger.info({ repo: repo.path, files: staged }, "Files staged");
 
-  // Commit
   try {
     await git.commit(message);
     ui.showMessage(`${repo.path}: ${t().commitDone} (${staged.length} ${t().filesUnit})`, "success");
     logger.info({ repo: repo.path, message }, "Committed");
+    return true;
   } catch (err) {
     const reason = parseGitError(err);
     logger.error({ repo: repo.path, err }, "Commit failed");
-
     ui.showMessage(`${repo.path}: ${t().commitFailed}`, "error");
     ui.showMessage(`  ${t().commitFailCause}: ${reason}`, "error");
     showCommitFailureHelp(reason, ui);
-    return;
-  }
-
-  if (action === "skip") {
-    ui.showMessage(`${repo.path}: ${t().localCommitKept}`, "info");
-    return;
-  }
-
-  // Push
-  if (action === "push") {
-    await pushWithRetry(repo, git, ui, logger);
+    return false;
   }
 }
 
-async function pushWithRetry(
+export async function pushRepo(
   repo: RepoState,
-  git: ReturnType<typeof simpleGit>,
   ui: UI,
   logger: Logger,
 ): Promise<void> {
+  const git = simpleGit(repo.path);
   const stopSpinner = ui.showSpinner(`${repo.path}: ${t().pushing}`);
 
   try {
@@ -94,35 +71,40 @@ async function pushWithRetry(
     ui.showMessage(`${repo.path}: ${t().pushFailed} — ${firstReason}`, "warn");
     logger.warn({ repo: repo.path, reason: firstReason }, "Push failed");
 
-    // Retry with pull
     if (isRetryable(firstReason)) {
-      ui.showMessage(`  ${t().pushRetry}`, "info");
-      const stopPull = ui.showSpinner("pull...");
-
-      try {
-        await git.pull();
-        stopPull();
-        const stopRetry = ui.showSpinner(t().pushing);
-        await git.push();
-        stopRetry();
-        ui.showMessage(`${repo.path}: ${t().pushRetryDone}`, "success");
-        logger.info({ repo: repo.path }, "Push succeeded after pull");
-        return;
-      } catch (retryErr) {
-        stopPull();
-        const retryReason = parseGitError(retryErr);
-        logger.error({ repo: repo.path, err: retryErr }, "Pull+push failed");
-
-        ui.showMessage(`${repo.path}: ${t().pushFailFinal}`, "error");
-        ui.showMessage(`  ${t().commitFailCause}: ${retryReason}`, "error");
-        showPushFailureHelp(retryReason, repo.branch, ui);
-        return;
-      }
+      await retryPushAfterPull(repo, git, ui, logger);
+      return;
     }
 
-    // Not retryable
     ui.showMessage(`  ${t().commitFailCause}: ${firstReason}`, "error");
     showPushFailureHelp(firstReason, repo.branch, ui);
+  }
+}
+
+async function retryPushAfterPull(
+  repo: RepoState,
+  git: SimpleGit,
+  ui: UI,
+  logger: Logger,
+): Promise<void> {
+  ui.showMessage(`  ${t().pushRetry}`, "info");
+  const stopPull = ui.showSpinner("pull...");
+
+  try {
+    await git.pull();
+    stopPull();
+    const stopRetry = ui.showSpinner(t().pushing);
+    await git.push();
+    stopRetry();
+    ui.showMessage(`${repo.path}: ${t().pushRetryDone}`, "success");
+    logger.info({ repo: repo.path }, "Push succeeded after pull");
+  } catch (retryErr) {
+    stopPull();
+    const retryReason = parseGitError(retryErr);
+    logger.error({ repo: repo.path, err: retryErr }, "Pull+push failed");
+    ui.showMessage(`${repo.path}: ${t().pushFailFinal}`, "error");
+    ui.showMessage(`  ${t().commitFailCause}: ${retryReason}`, "error");
+    showPushFailureHelp(retryReason, repo.branch, ui);
   }
 }
 

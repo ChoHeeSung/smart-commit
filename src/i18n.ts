@@ -72,13 +72,17 @@ export interface Messages {
   offlineSelect: string;
   offlineInputMsg: string;
 
-  // Actions
-  selectAction: string;
-  actionPush: string;
-  actionSkip: string;
-  actionCancel: string;
+  // Actions — group prompt (per commit group)
+  selectGroupAction: string;
+  actionCommit: string;
+  actionSkipGroup: string;
   actionSkipRepo: string;
   actionExit: string;
+  // Actions — push prompt (per repo, after all group commits)
+  selectPushAction: string;
+  pushReadyHeader: (n: number) => string;
+  actionPush: string;
+  actionKeepLocal: string;
 
   // Commit
   commitDone: string;
@@ -216,12 +220,15 @@ const ko: Messages = {
   offlineSelect: "AI 사용 불가 — 오프라인 템플릿을 선택하세요:",
   offlineInputMsg: "커밋 메시지를 입력하세요 (접두사 포함):",
 
-  selectAction: "Select action:",
-  actionPush: "Push (푸시 실행)",
-  actionSkip: "Skip (로컬 커밋 유지)",
-  actionCancel: "Cancel (커밋 취소)",
-  actionSkipRepo: "Skip repo (이 저장소 건너뛰기)",
+  selectGroupAction: "Commit?",
+  actionCommit: "Commit (커밋 진행)",
+  actionSkipGroup: "Skip this group (이 그룹 건너뜀)",
+  actionSkipRepo: "Skip rest of repo (이 저장소 남은 그룹 건너뜀)",
   actionExit: "Exit (종료)",
+  selectPushAction: "Push?",
+  pushReadyHeader: (n) => `${n}개 커밋 푸시 대기 중`,
+  actionPush: "Push (지금 푸시)",
+  actionKeepLocal: "Keep local only (로컬 커밋 유지)",
 
   commitDone: "커밋 완료",
   commitFailed: "커밋 실패",
@@ -351,12 +358,15 @@ const en: Messages = {
   offlineSelect: "AI unavailable — select an offline template:",
   offlineInputMsg: "Enter commit message (with prefix):",
 
-  selectAction: "Select action:",
-  actionPush: "Push",
-  actionSkip: "Skip (keep local commit)",
-  actionCancel: "Cancel (don't commit)",
-  actionSkipRepo: "Skip repo",
+  selectGroupAction: "Commit?",
+  actionCommit: "Commit",
+  actionSkipGroup: "Skip this group",
+  actionSkipRepo: "Skip rest of repo",
   actionExit: "Exit",
+  selectPushAction: "Push?",
+  pushReadyHeader: (n) => `${n} commit(s) ready to push`,
+  actionPush: "Push",
+  actionKeepLocal: "Keep local only",
 
   commitDone: "Committed",
   commitFailed: "Commit failed",

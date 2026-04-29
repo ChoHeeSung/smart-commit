@@ -3,6 +3,7 @@ import type { Modal } from "../store.js";
 // Text 는 위 줄의 heading bar 용으로 사용.
 import { ConfirmModal } from "../modals/ConfirmModal.js";
 import { ActionMenuModal } from "../modals/ActionMenuModal.js";
+import { PushMenuModal } from "../modals/PushMenuModal.js";
 import { LfsExtSelectModal } from "../modals/LfsExtSelectModal.js";
 import { OfflineTemplateModal } from "../modals/OfflineTemplateModal.js";
 import { InputModal } from "../modals/InputModal.js";
@@ -70,8 +71,10 @@ function renderModal(modal: Modal) {
     }
     case "lfs-ext-select":
       return <LfsExtSelectModal extensions={modal.extensions} onSubmit={modal.resolve} />;
-    case "action-menu":
+    case "group-action-menu":
       return <ActionMenuModal onSubmit={modal.resolve} />;
+    case "push-action-menu":
+      return <PushMenuModal commitCount={modal.commitCount} onSubmit={modal.resolve} />;
     case "offline-template":
       return <OfflineTemplateModal templates={modal.templates} onSubmit={modal.resolve} />;
     case "input":

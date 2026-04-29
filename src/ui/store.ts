@@ -2,10 +2,11 @@ import { useSyncExternalStore } from "react";
 import type {
   BlockedFile,
   FileChange,
+  GroupAction,
   LfsInstallPlan,
+  PushAction,
   RepoState,
   SmartCommitConfig,
-  UserAction,
 } from "../types.js";
 
 export type Phase = "idle" | "scanning" | "selecting" | "processing" | "done";
@@ -30,7 +31,8 @@ export type Modal =
   | { type: "lfs-init"; repo: RepoState; resolve: (yes: boolean) => void }
   | { type: "lfs-install"; plan: LfsInstallPlan; resolve: (yes: boolean) => void }
   | { type: "lfs-ext-select"; extensions: string[]; resolve: (picked: string[]) => void }
-  | { type: "action-menu"; resolve: (action: UserAction) => void }
+  | { type: "group-action-menu"; resolve: (action: GroupAction) => void }
+  | { type: "push-action-menu"; commitCount: number; resolve: (action: PushAction) => void }
   | { type: "offline-template"; templates: string[]; resolve: (msg: string) => void }
   | { type: "input"; label: string; resolve: (text: string) => void };
 

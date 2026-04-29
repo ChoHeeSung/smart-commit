@@ -4,7 +4,8 @@ import type {
   FileChange,
   BlockedFile,
   SmartCommitConfig,
-  UserAction,
+  GroupAction,
+  PushAction,
   LfsInstallPlan,
 } from "../types.js";
 import { App } from "./App.js";
@@ -22,7 +23,8 @@ export interface UI {
   selectLfsExtensions(extensions: string[]): Promise<string[]>;
   confirmLfsInstall(plan: LfsInstallPlan): Promise<boolean>;
   showCommitPreview(repo: RepoState, message: string, files: FileChange[]): void;
-  promptAction(): Promise<UserAction>;
+  promptGroupAction(): Promise<GroupAction>;
+  promptPushAction(commitCount: number): Promise<PushAction>;
   promptOfflineTemplate(templates: string[]): Promise<string>;
   promptInput(label: string): Promise<string>;
   showMessage(msg: string, level: "info" | "success" | "warn" | "error"): void;
@@ -120,10 +122,20 @@ export function createUI(): UI {
       store.setBlocked(null);
     },
 
-    promptAction() {
-      return new Promise<UserAction>((resolve) => {
+    promptGroupAction() {
+      return new Promise<GroupAction>((resolve) => {
         store.openModal({
-          type: "action-menu",
+          type: "group-action-menu",
+          resolve: (action) => { store.closeModal(); resolve(action); },
+        });
+      });
+    },
+
+    promptPushAction(commitCount) {
+      return new Promise<PushAction>((resolve) => {
+        store.openModal({
+          type: "push-action-menu",
+          commitCount,
           resolve: (action) => { store.closeModal(); resolve(action); },
         });
       });
