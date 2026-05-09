@@ -1,80 +1,92 @@
 import { useSyncExternalStore } from "react";
-import type {
-  BlockedFile,
-  FileChange,
-  GroupAction,
-  LfsInstallPlan,
-  PushAction,
-  RepoState,
-  SmartCommitConfig,
-} from "../types.js";
+import type { CommitGroup, RepoState, SmartCommitConfig } from "../types.js";
 
-export type Phase = "idle" | "scanning" | "selecting" | "processing" | "done";
+export type Phase = "scan" | "select" | "preview" | "execute" | "done";
 
-export type LogLevel = "info" | "success" | "warn" | "error";
-
-export interface LogEntry {
-  id: number;
-  level: LogLevel;
-  text: string;
+export interface ScanProgress {
+  current: number;
+  total: number;
+  label: string;
 }
 
-export interface Activity {
-  repoPath: string;
-  message: string;
-  files: FileChange[];
-  groupReason?: string;
+export interface RepoPreview {
+  repo: RepoState;
+  groups: CommitGroup[];
+  status: "pending" | "generating" | "ready" | "skipped" | "error";
+  skipReason?: string;
 }
 
-export type Modal =
-  | { type: "confirm-warned"; repo: RepoState; files: FileChange[]; resolve: (yes: boolean) => void }
-  | { type: "lfs-init"; repo: RepoState; resolve: (yes: boolean) => void }
-  | { type: "lfs-install"; plan: LfsInstallPlan; resolve: (yes: boolean) => void }
-  | { type: "lfs-ext-select"; extensions: string[]; resolve: (picked: string[]) => void }
-  | { type: "group-action-menu"; resolve: (action: GroupAction) => void }
-  | { type: "push-action-menu"; commitCount: number; resolve: (action: PushAction) => void }
-  | { type: "offline-template"; templates: string[]; resolve: (msg: string) => void }
-  | { type: "input"; label: string; resolve: (text: string) => void };
+export type ExecStepKind = "stage" | "commit" | "push" | "pull";
+export type ExecStepStatus = "pending" | "running" | "ok" | "fail" | "skip";
+
+export interface ExecStep {
+  kind: ExecStepKind;
+  label: string;
+  status: ExecStepStatus;
+  detail?: string;
+}
+
+export interface ExecRepoState {
+  repo: RepoState;
+  steps: ExecStep[];
+  status: "pending" | "running" | "done" | "failed" | "skipped";
+}
+
+export interface DoneSummary {
+  total: number;
+  committed: number;
+  pushed: number;
+  failed: number;
+  skipped: number;
+  failures: { repo: string; reason: string }[];
+  skips: { repo: string; reason: string }[];
+}
 
 export interface UiState {
   phase: Phase;
   header: { config: SmartCommitConfig; version: string } | null;
-  scanProgress: { label: string; current: number; total: number } | null;
+
+  scan: ScanProgress | null;
+
   repos: RepoState[];
   cursor: number;
   selection: Set<string>;
-  selectingResolve: ((selected: RepoState[]) => void) | null;
-  activity: Activity | null;
-  log: LogEntry[];
-  blocked: { repoPath: string; files: BlockedFile[] } | null;
-  modal: Modal | null;
-  spinnerLabel: string | null;
+  selectResolve: ((paths: string[] | null) => void) | null;
+
+  previews: RepoPreview[];
+  previewCursor: number;
+  previewResolve: ((proceed: boolean) => void) | null;
+
+  execRepos: ExecRepoState[];
+  execCursor: number;
+  abortRequested: boolean;
+
+  summary: DoneSummary | null;
+  doneResolve: (() => void) | null;
 }
 
-const MAX_LOG = 50;
-
 let state: UiState = {
-  phase: "idle",
+  phase: "scan",
   header: null,
-  scanProgress: null,
+  scan: null,
   repos: [],
   cursor: 0,
   selection: new Set(),
-  selectingResolve: null,
-  activity: null,
-  log: [],
-  blocked: null,
-  modal: null,
-  spinnerLabel: null,
+  selectResolve: null,
+  previews: [],
+  previewCursor: 0,
+  previewResolve: null,
+  execRepos: [],
+  execCursor: 0,
+  abortRequested: false,
+  summary: null,
+  doneResolve: null,
 };
 
 const listeners = new Set<() => void>();
-let logId = 0;
-
 function emit(): void {
   for (const l of listeners) l();
 }
-
 function update(patch: Partial<UiState>): void {
   state = { ...state, ...patch };
   emit();
@@ -92,111 +104,149 @@ export const store = {
     update({ header: { config, version } });
   },
 
-  setScanProgress(p: { label: string; current: number; total: number } | null): void {
-    update({
-      scanProgress: p,
-      phase: p && p.current < p.total ? "scanning" : state.phase,
-    });
+  setScan(p: ScanProgress | null): void {
+    update({ scan: p, phase: p ? "scan" : state.phase });
   },
 
-  setRepos(repos: RepoState[]): void {
-    update({ repos, phase: "processing", scanProgress: null });
-  },
-
-  openRepoSelect(repos: RepoState[], resolve: (selected: RepoState[]) => void): void {
+  startSelect(repos: RepoState[], resolve: (paths: string[] | null) => void): void {
+    const dirty = repos.filter((r) => r.status === "dirty");
     update({
+      phase: "select",
       repos,
-      phase: "selecting",
       cursor: 0,
-      selection: new Set(repos.map((r) => r.path)),
-      selectingResolve: resolve,
+      selection: new Set(dirty.map((r) => r.path)),
+      selectResolve: resolve,
     });
   },
 
   moveCursor(delta: number): void {
     const total = state.repos.length;
     if (total === 0) return;
-    const cursor = (state.cursor + delta + total) % total;
-    update({ cursor });
+    const next = Math.max(0, Math.min(total - 1, state.cursor + delta));
+    update({ cursor: next });
   },
 
   toggleCurrent(): void {
     const repo = state.repos[state.cursor];
     if (!repo) return;
-    const selection = new Set(state.selection);
-    if (selection.has(repo.path)) selection.delete(repo.path);
-    else selection.add(repo.path);
-    update({ selection });
+    if (repo.status !== "dirty") return;
+    const sel = new Set(state.selection);
+    if (sel.has(repo.path)) sel.delete(repo.path);
+    else sel.add(repo.path);
+    update({ selection: sel });
   },
 
   toggleAll(): void {
-    if (state.selection.size === state.repos.length) {
-      update({ selection: new Set() });
-    } else {
-      update({ selection: new Set(state.repos.map((r) => r.path)) });
-    }
+    const dirty = state.repos.filter((r) => r.status === "dirty");
+    const allOn = dirty.every((r) => state.selection.has(r.path));
+    update({ selection: allOn ? new Set() : new Set(dirty.map((r) => r.path)) });
   },
 
-  confirmRepoSelection(): void {
-    const resolve = state.selectingResolve;
+  confirmSelect(): void {
+    const resolve = state.selectResolve;
     if (!resolve) return;
-    const picked = state.repos.filter((r) => state.selection.has(r.path));
-    update({ selectingResolve: null, phase: "processing" });
-    resolve(picked);
+    const paths = state.repos
+      .filter((r) => state.selection.has(r.path))
+      .map((r) => r.path);
+    update({ selectResolve: null });
+    resolve(paths);
   },
 
-  cancelRepoSelection(): void {
-    const resolve = state.selectingResolve;
+  cancelSelect(): void {
+    const resolve = state.selectResolve;
     if (!resolve) return;
-    update({ selectingResolve: null, phase: "processing" });
-    resolve([]);
+    update({ selectResolve: null });
+    resolve(null);
   },
 
-  setActivity(activity: Activity | null): void {
-    update({ activity });
+  startPreview(previews: RepoPreview[], resolve: (proceed: boolean) => void): void {
+    update({
+      phase: "preview",
+      previews,
+      previewCursor: 0,
+      previewResolve: resolve,
+    });
   },
 
-  setBlocked(blocked: UiState["blocked"]): void {
-    update({ blocked });
+  updatePreview(idx: number, patch: Partial<RepoPreview>): void {
+    const previews = state.previews.slice();
+    if (!previews[idx]) return;
+    previews[idx] = { ...previews[idx], ...patch };
+    update({ previews });
   },
 
-  appendLog(level: LogLevel, text: string): void {
-    const entry: LogEntry = { id: ++logId, level, text };
-    const log = [...state.log, entry].slice(-MAX_LOG);
-    update({ log });
+  movePreview(delta: number): void {
+    const total = state.previews.length;
+    if (total === 0) return;
+    const next = Math.max(0, Math.min(total - 1, state.previewCursor + delta));
+    update({ previewCursor: next });
   },
 
-  setSpinner(label: string | null): void {
-    update({ spinnerLabel: label });
+  confirmPreview(): void {
+    const resolve = state.previewResolve;
+    if (!resolve) return;
+    update({ previewResolve: null });
+    resolve(true);
   },
 
-  openModal(modal: Modal): void {
-    update({ modal });
+  cancelPreview(): void {
+    const resolve = state.previewResolve;
+    if (!resolve) return;
+    update({ previewResolve: null });
+    resolve(false);
   },
 
-  closeModal(): void {
-    update({ modal: null });
+  startExecute(execRepos: ExecRepoState[]): void {
+    update({
+      phase: "execute",
+      execRepos,
+      execCursor: 0,
+      abortRequested: false,
+    });
   },
 
-  setPhase(phase: Phase): void {
-    update({ phase });
+  setExecCursor(idx: number): void {
+    update({ execCursor: idx });
   },
 
-  reset(): void {
-    state = {
-      ...state,
-      phase: "idle",
-      scanProgress: null,
-      repos: [],
-      cursor: 0,
-      selection: new Set(),
-      activity: null,
-      log: [],
-      blocked: null,
-      modal: null,
-      spinnerLabel: null,
-    };
-    emit();
+  updateExecRepo(idx: number, patch: Partial<ExecRepoState>): void {
+    const execRepos = state.execRepos.slice();
+    if (!execRepos[idx]) return;
+    execRepos[idx] = { ...execRepos[idx], ...patch };
+    update({ execRepos });
+  },
+
+  pushExecStep(idx: number, step: ExecStep): void {
+    const execRepos = state.execRepos.slice();
+    if (!execRepos[idx]) return;
+    execRepos[idx] = { ...execRepos[idx], steps: [...execRepos[idx].steps, step] };
+    update({ execRepos });
+  },
+
+  updateExecStep(idx: number, stepIdx: number, patch: Partial<ExecStep>): void {
+    const execRepos = state.execRepos.slice();
+    const r = execRepos[idx];
+    if (!r) return;
+    const steps = r.steps.slice();
+    if (!steps[stepIdx]) return;
+    steps[stepIdx] = { ...steps[stepIdx], ...patch };
+    execRepos[idx] = { ...r, steps };
+    update({ execRepos });
+  },
+
+  requestAbort(): void {
+    update({ abortRequested: true });
+  },
+
+  startDone(summary: DoneSummary, resolve: () => void): void {
+    update({ phase: "done", summary, doneResolve: resolve });
+  },
+
+  finishDone(): void {
+    const r = state.doneResolve;
+    if (!r) return;
+    update({ doneResolve: null });
+    r();
   },
 };
 

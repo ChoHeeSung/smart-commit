@@ -10,22 +10,14 @@ import { createAiClient, isAiAvailable, getOfflineTemplates, type AiClient } fro
 import { commitGroup, pushRepo } from "./committer.js";
 import type { Logger } from "pino";
 import type { CommitGroup } from "./types.js";
-import { createUI, type UI } from "./ui/index.js";
+import { createUI, type UI, type ExecOps } from "./ui/index.js";
 import { createLogger } from "./logger.js";
 import { t, setLocale, type Locale } from "./i18n.js";
-import type { RepoState, GroupAction, PushAction, FileChange, BlockedFile, SmartCommitConfig } from "./types.js";
+import type { RepoState, FileChange, BlockedFile, SmartCommitConfig } from "./types.js";
 import {
-  detectOs,
-  detectPackageManager,
-  isLfsInstalled,
-  getLfsVersion,
   isLfsInitialized,
-  buildInstallPlan,
-  runInstallPlan,
-  initLfsRepo,
   trackExtensions,
   uniqueExtensions,
-  isBitbucketRemote,
 } from "./lfs.js";
 
 const program = new Command();
@@ -44,184 +36,80 @@ program
     if (options.lang) setLocale(options.lang as Locale);
     const config = await loadConfig(options);
     const logger = createLogger();
-    const ui = createUI();
-    const ai = createAiClient(config, logger);
     const isHeadless = options.interactive === false;
+    const ui = createUI({ headless: isHeadless });
+    const ai = createAiClient(config, logger);
+    const dryRun = options.dryRun ?? false;
 
     logger.info({ options }, "smart-commit started");
-
     ui.showHeader(config, PKG_VERSION);
 
-    // Check AI availability (skip in offline mode)
     let offlineMode = options.offline ?? false;
     if (!offlineMode) {
       const primaryAvail = await isAiAvailable(config.ai.primary);
       const fallbackAvail = await isAiAvailable(config.ai.fallback);
       if (!primaryAvail && !fallbackAvail) {
-        ui.showMessage(t().offlineSwitch, "warn");
-        offlineMode = true;
         logger.warn("No AI tools available, switching to offline mode");
-      } else if (!primaryAvail) {
-        ui.showMessage(`${config.ai.primary}를 찾을 수 없습니다. ${config.ai.fallback}를 사용합니다.`, "warn");
+        offlineMode = true;
       }
     }
 
     const repos = await scanRepositories(process.cwd(), ui, logger);
-
     if (repos.length === 0) {
-      ui.showMessage(t().noChanges, "info");
+      logger.info("No repositories with changes");
       ui.cleanup();
+      process.stdout.write(`${t().noChanges}\n`);
       return;
     }
 
-    ui.showRepoTable(repos);
-
-    // Interactive repo selection (skip in headless mode)
-    let selectedPaths: Set<string> | null = null;
-    if (!isHeadless) {
-      const selected = await ui.selectRepos(repos);
-      if (selected.length === 0) {
-        ui.showMessage(t().noReposSelected, "info");
+    // ── Phase: select ──
+    let selected: RepoState[];
+    if (isHeadless) {
+      selected = repos.filter((r) => r.status === "dirty");
+    } else {
+      const result = await ui.runSelect(repos);
+      if (result === null) {
         ui.cleanup();
+        process.stdout.write(`${t().noReposSelected}\n`);
         return;
       }
-      selectedPaths = new Set(selected.map((r) => r.path));
+      selected = result;
     }
 
-    for (const repo of repos) {
-      if (repo.status !== "dirty") {
-        // Clean repo with only unpushed commits — offer push
-        if (repo.status === "clean" && repo.unpushedCommits > 0) {
-          const exit = await handleUnpushedOnly(repo, ui, logger, options.dryRun ?? false, isHeadless);
-          if (exit) {
-            ui.cleanup();
-            return;
-          }
-        }
-        continue;
-      }
-
-      // Skip repos not selected by user
-      if (selectedPaths && !selectedPaths.has(repo.path)) continue;
-
-      const safety = await classifyFiles(repo.files, config, repo.path);
-
-      if (safety.blocked.length > 0) {
-        ui.showBlocked(repo, safety.blocked);
-      }
-
-      // Offer Git LFS for size-blocked files
-      const sizeBlocked = safety.blocked.filter((b) => b.reason === "size");
-      if (sizeBlocked.length > 0 && config.safety.lfsPrompt) {
-        const lfsAccepted = await handleLfsOption(repo, sizeBlocked, config, ui, isHeadless);
-        if (lfsAccepted.promoted.length > 0) {
-          safety.safe.push(...lfsAccepted.promoted);
-          safety.blocked = safety.blocked.filter(
-            (b) => !lfsAccepted.promoted.some((p) => p.path === b.file.path),
-          );
-          if (lfsAccepted.gitattributesFile) {
-            safety.safe.push(lfsAccepted.gitattributesFile);
-          }
-        }
-      }
-
-      if (safety.warned.length > 0) {
-        if (isHeadless) {
-          ui.showMessage(`${repo.path}: ${safety.warned.length} ${t().warnFiles} — headless`, "warn");
-        } else {
-          const proceed = await ui.confirmWarned(repo, safety.warned);
-          if (proceed) {
-            safety.safe.push(...safety.warned);
-          }
-        }
-      }
-
-      if (safety.safe.length === 0) {
-        ui.showMessage(`${repo.path}: ${t().noSafeFiles}`, "warn");
-        continue;
-      }
-
-      const groups = await groupFiles(
-        safety.safe,
-        offlineMode ? "single" : config.grouping.strategy,
-        !offlineMode && config.grouping.strategy === "smart"
-          ? (fileList) => ai.groupFiles(fileList)
-          : null,
-        logger,
-      );
-
-      // ── Phase 1: commit all groups (no push) ──
-      let commitsCreated = 0;
-      let exitRequested = false;
-      let skipRepo = false;
-
-      for (const group of groups) {
-        const commitMsg = await resolveCommitMessage(repo, group, ai, ui, config.commit.language, offlineMode, isHeadless);
-        if (!commitMsg) continue;
-
-        ui.showCommitPreview(repo, commitMsg, group.files);
-        if (group.reason) {
-          ui.showMessage(`  ${t().aiGroupReason}: ${group.reason}`, "info");
-        }
-
-        if (options.dryRun) {
-          ui.showMessage(t().dryRun, "info");
-          continue;
-        }
-
-        const action: GroupAction = isHeadless ? "commit" : await ui.promptGroupAction();
-
-        if (action === "exit") {
-          exitRequested = true;
-          break;
-        }
-        if (action === "skip-repo") {
-          ui.showMessage(`${repo.path}: ${t().skipRepo}`, "info");
-          skipRepo = true;
-          break;
-        }
-        if (action === "skip-group") continue;
-
-        const ok = await commitGroup(repo, group.files, commitMsg, ui, logger);
-        if (ok) commitsCreated++;
-      }
-
-      if (exitRequested) {
-        ui.showMessage(t().exiting, "info");
-        ui.cleanup();
-        return;
-      }
-
-      // ── Phase 2: push once per repo ──
-      if (skipRepo) continue;
-      if (options.dryRun) continue;
-      if (commitsCreated === 0) continue;
-      if (!repo.hasRemote) {
-        ui.showMessage(`${repo.path}: ${t().noRemoteSkipPush}`, "info");
-        continue;
-      }
-
-      const totalPending = commitsCreated + repo.unpushedCommits;
-
-      if (isHeadless) {
-        await pushRepo(repo, ui, logger);
-        continue;
-      }
-
-      const pushAction: PushAction = await ui.promptPushAction(totalPending);
-      if (pushAction === "exit") {
-        ui.showMessage(t().exiting, "info");
-        ui.cleanup();
-        return;
-      }
-      if (pushAction === "keep-local") {
-        ui.showMessage(`${repo.path}: ${t().localCommitKept}`, "info");
-        continue;
-      }
-      await pushRepo(repo, ui, logger);
+    if (selected.length === 0) {
+      ui.cleanup();
+      process.stdout.write(`${t().noReposSelected}\n`);
+      return;
     }
 
-    ui.showComplete();
+    // ── Phase: preview (AI generation) ──
+    const previewInputs = selected.map((r) => ({ repo: r }));
+    const previewOutcome = await ui.runPreview(previewInputs, async (_idx, repo) => {
+      return generatePreviewForRepo(repo, ai, config, offlineMode, logger);
+    });
+
+    if (!isHeadless && !previewOutcome.proceed) {
+      ui.cleanup();
+      process.stdout.write(`${t().exiting}\n`);
+      return;
+    }
+
+    const readyPlans = previewOutcome.previews
+      .filter((p) => p.status === "ready" && p.groups.length > 0)
+      .map((p) => ({ repo: p.repo, groups: p.groups }));
+
+    if (readyPlans.length === 0) {
+      ui.cleanup();
+      process.stdout.write(`${t().noChanges}\n`);
+      return;
+    }
+
+    // ── Phase: execute (commit + push, no prompts) ──
+    const summary = await ui.runExecute(readyPlans, async (_i, repo, groups, ops) => {
+      await executeRepo(repo, groups, ops, ui, logger, dryRun);
+    });
+
+    await ui.runDone(summary);
     ui.cleanup();
   });
 
@@ -233,244 +121,215 @@ program
   .option("--uninstall", "Remove smart-commit hooks")
   .action(async (options) => {
     const { installHooks, uninstallHooks } = await import("./hooks/install.js");
-    const ui = createUI();
 
     if (options.uninstall) {
       const removed = await uninstallHooks(process.cwd());
       if (removed.length > 0) {
-        ui.showMessage(`${t().hookRemoved}: ${removed.join(", ")}`, "success");
+        process.stdout.write(`${t().hookRemoved}: ${removed.join(", ")}\n`);
       } else {
-        ui.showMessage(t().hookNone, "info");
+        process.stdout.write(`${t().hookNone}\n`);
       }
     } else {
       const { installed, skipped } = await installHooks(process.cwd());
       if (installed.length > 0) {
-        ui.showMessage(`${t().hookInstalled}: ${installed.join(", ")}`, "success");
+        process.stdout.write(`${t().hookInstalled}: ${installed.join(", ")}\n`);
       }
       if (skipped.length > 0) {
-        ui.showMessage(`${t().hookSkipped}: ${skipped.join(", ")}`, "warn");
+        process.stdout.write(`${t().hookSkipped}: ${skipped.join(", ")}\n`);
+      }
+    }
+  });
+
+// ── Per-repo preview generation ──
+
+interface PreviewResult {
+  groups: CommitGroup[];
+  status: "ready" | "skipped" | "error";
+  reason?: string;
+}
+
+async function generatePreviewForRepo(
+  repo: RepoState,
+  ai: AiClient,
+  config: SmartCommitConfig,
+  offlineMode: boolean,
+  logger: Logger,
+): Promise<PreviewResult> {
+  try {
+    if (repo.status !== "dirty") {
+      return { groups: [], status: "skipped", reason: `상태=${repo.status}` };
+    }
+
+    const safety = await classifyFiles(repo.files, config, repo.path);
+
+    // Auto-LFS handling (config-driven, no prompts)
+    const sizeBlocked = safety.blocked.filter((b) => b.reason === "size");
+    if (sizeBlocked.length > 0 && config.safety.lfsAutoTrack) {
+      const promoted = await autoPromoteLfs(repo, sizeBlocked, config, logger);
+      if (promoted.length > 0) {
+        safety.safe.push(...promoted);
+        safety.safe.push({ path: ".gitattributes", status: "modified", size: 0, isBinary: false });
       }
     }
 
-    ui.cleanup();
-  });
+    // Auto-include warned files (no prompt). Sensitive blocked files stay blocked.
+    if (safety.warned.length > 0) safety.safe.push(...safety.warned);
 
-// Returns true if user requested exit.
-async function handleUnpushedOnly(
-  repo: RepoState,
-  ui: UI,
-  logger: Logger,
-  dryRun: boolean,
-  isHeadless: boolean,
-): Promise<boolean> {
-  if (!repo.hasRemote) {
-    ui.showMessage(`${repo.path}: ${t().noRemoteSkipPush}`, "info");
-    return false;
-  }
+    if (safety.safe.length === 0) {
+      const reason = safety.blocked.length > 0
+        ? `안전한 파일 0개 (${safety.blocked.length}개 차단)`
+        : "안전한 파일 0개";
+      return { groups: [], status: "skipped", reason };
+    }
 
-  ui.showMessage(`${repo.path}: ${t().unpushedFound(repo.unpushedCommits)}`, "info");
+    const strategy = offlineMode ? "single" : config.grouping.strategy;
+    const groups = await groupFiles(
+      safety.safe,
+      strategy,
+      !offlineMode && strategy === "smart" ? (fl) => ai.groupFiles(fl) : null,
+      logger,
+    );
 
-  if (dryRun) {
-    ui.showMessage(t().dryRunSkipPush, "info");
-    return false;
-  }
+    for (const g of groups) {
+      const msg = await resolveCommitMessage(repo, g, ai, config.commit.language, offlineMode, logger);
+      if (!msg) {
+        return { groups: [], status: "error", reason: "AI 메시지 생성 실패" };
+      }
+      g.message = msg;
+    }
 
-  if (isHeadless) {
-    await pushRepo(repo, ui, logger);
-    return false;
+    return { groups, status: "ready" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ repo: repo.path, err }, "Preview generation failed");
+    return { groups: [], status: "error", reason: msg };
   }
-
-  const action = await ui.promptPushAction(repo.unpushedCommits);
-  if (action === "exit") {
-    ui.showMessage(t().exiting, "info");
-    return true;
-  }
-  if (action === "keep-local") {
-    ui.showMessage(`${repo.path}: ${t().localCommitKept}`, "info");
-    return false;
-  }
-  await pushRepo(repo, ui, logger);
-  return false;
 }
 
 async function resolveCommitMessage(
   repo: RepoState,
   group: CommitGroup,
   ai: AiClient,
-  ui: UI,
   language: string,
   offlineMode: boolean,
-  isHeadless: boolean,
+  logger: Logger,
 ): Promise<string | null> {
   if (offlineMode) {
-    if (isHeadless) return `chore: auto-commit ${group.files.length} files`;
-    return await ui.promptOfflineTemplate(getOfflineTemplates());
+    const templates = getOfflineTemplates();
+    return templates[0] ?? `chore: auto-commit ${group.files.length} files`;
+  }
+  try {
+    const diff = await getDiff(repo, group.files);
+    const summarizedDiff = await ai.summarizeDiff(diff);
+    const message = await ai.generateCommitMessage(summarizedDiff, language);
+    if (message) return message;
+  } catch (err) {
+    logger.warn({ repo: repo.path, err }, "AI message generation failed");
+  }
+  return `chore: auto-commit ${group.files.length} files`;
+}
+
+// ── Per-repo execution ──
+
+async function executeRepo(
+  repo: RepoState,
+  groups: CommitGroup[],
+  ops: ExecOps,
+  ui: UI,
+  logger: Logger,
+  dryRun: boolean,
+): Promise<void> {
+  let commitsCreated = 0;
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    if (ops.isAborted()) {
+      ops.setStatus("skipped");
+      ops.addStep("commit", `g${gi + 1}`);
+      ops.updateStep(ops.addStep("commit", `g${gi + 1} 중단`), "skip", "사용자 중단");
+      return;
+    }
+
+    const g = groups[gi];
+    const label = `commit g${gi + 1}/${groups.length}`;
+
+    if (dryRun) {
+      const stepIdx = ops.addStep("commit", label);
+      ops.updateStep(stepIdx, "skip", "(dry-run)");
+      continue;
+    }
+
+    const stepIdx = ops.addStep("commit", label);
+    const ok = await commitGroup(repo, g.files, g.message ?? `chore: auto-commit ${g.files.length} files`, ui, logger);
+    if (ok) {
+      ops.updateStep(stepIdx, "ok");
+      commitsCreated++;
+    } else {
+      ops.updateStep(stepIdx, "fail", "commit 실패");
+      ops.setStatus("failed");
+      return;
+    }
   }
 
-  const stopSpinner = ui.showSpinner(t().aiGenerating);
-  const diff = await getDiff(repo, group.files);
-  const summarizedDiff = await ai.summarizeDiff(diff);
-  let message = await ai.generateCommitMessage(summarizedDiff, language);
-  stopSpinner();
+  if (dryRun) return;
 
-  if (message) return message;
+  if (commitsCreated === 0 && repo.unpushedCommits === 0) {
+    ops.setStatus("skipped");
+    return;
+  }
 
-  ui.showMessage(`${repo.path} [${group.label}]: ${t().aiFailed}`, "warn");
-  if (isHeadless) return `chore: auto-commit ${group.files.length} files`;
+  if (!repo.hasRemote) {
+    const stepIdx = ops.addStep("push", "push");
+    ops.updateStep(stepIdx, "skip", "리모트 없음");
+    return;
+  }
 
-  ui.showMessage(t().offlineSwitch, "info");
-  message = await ui.promptOfflineTemplate(getOfflineTemplates());
-  return message;
+  const stepIdx = ops.addStep("push", "push");
+  try {
+    await pushRepo(repo, ui, logger);
+    ops.updateStep(stepIdx, "ok");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    ops.updateStep(stepIdx, "fail", msg);
+    ops.setStatus("failed");
+  }
 }
 
-interface LfsAcceptResult {
-  promoted: FileChange[];
-  gitattributesFile: FileChange | null;
-}
+// ── LFS auto-promotion (config-driven) ──
 
-async function handleLfsOption(
+async function autoPromoteLfs(
   repo: RepoState,
   sizeBlocked: BlockedFile[],
   config: SmartCommitConfig,
-  ui: UI,
-  isHeadless: boolean,
-): Promise<LfsAcceptResult> {
-  const empty: LfsAcceptResult = { promoted: [], gitattributesFile: null };
-
-  // Headless: only proceed if explicitly configured
-  if (isHeadless && !config.safety.lfsAutoTrack) {
-    ui.showMessage(t().lfsSkipHeadless, "info");
-    return empty;
-  }
-
-  // Ask user
-  if (!isHeadless) {
-    const proceed = await ui.confirmLfsInit(repo);
-    if (!proceed) {
-      ui.showMessage(t().lfsDecline, "info");
-      return empty;
-    }
-  }
-
-  // Ensure git-lfs binary exists
-  if (!isLfsInstalled()) {
-    const os = detectOs();
-    const pm = detectPackageManager(os);
-    const plan = buildInstallPlan(os, pm);
-
-    if (!plan) {
-      ui.showMessage(t().lfsNoPackageManager, "warn");
-      ui.showMessage(t().lfsManualInstallUrl, "info");
-      return empty;
-    }
-
-    let doInstall = config.safety.lfsAutoInstall;
-    if (!isHeadless) {
-      doInstall = await ui.confirmLfsInstall(plan);
-    }
-    if (!doInstall) {
-      ui.showMessage(t().lfsManualInstallUrl, "info");
-      return empty;
-    }
-
-    const stop = ui.showSpinner(t().lfsInstalling);
-    const result = await runInstallPlan(plan);
-    stop();
-
-    if (!result.ok || !isLfsInstalled()) {
-      ui.showMessage(`${t().lfsInstallFailed}: ${result.stderr.split("\n")[0] ?? ""}`, "error");
-      ui.showMessage(t().lfsManualInstallUrl, "info");
-      return empty;
-    }
-
-    const version = await getLfsVersion();
-    ui.showMessage(t().lfsInstalledOk(version ?? ""), "success");
-  }
-
-  // Extension selection
-  const filesOnly = sizeBlocked.map((b) => b.file);
-  const candidates = uniqueExtensions(filesOnly);
-  if (candidates.length === 0) return empty;
-
-  let selectedExts: string[];
-  if (isHeadless) {
-    selectedExts = config.safety.lfsTrackExtensions.length > 0
+  logger: Logger,
+): Promise<FileChange[]> {
+  try {
+    const filesOnly = sizeBlocked.map((b) => b.file);
+    const candidates = uniqueExtensions(filesOnly);
+    if (candidates.length === 0) return [];
+    const exts = config.safety.lfsTrackExtensions.length > 0
       ? config.safety.lfsTrackExtensions
       : candidates;
-  } else {
-    selectedExts = await ui.selectLfsExtensions(candidates);
-  }
 
-  if (selectedExts.length === 0) {
-    ui.showMessage(t().lfsNoExtensionsSelected, "info");
-    return empty;
-  }
-
-  // Initialize LFS in repo
-  if (!isLfsInitialized(repo.path)) {
-    try {
+    if (!isLfsInitialized(repo.path)) {
+      const { initLfsRepo } = await import("./lfs.js");
       await initLfsRepo(repo.path);
-      ui.showMessage(t().lfsRepoInit, "success");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      ui.showMessage(`git lfs install failed: ${msg.split("\n")[0]}`, "error");
-      return empty;
     }
-  }
+    await trackExtensions(repo.path, exts);
 
-  // Update .gitattributes
-  try {
-    const added = await trackExtensions(repo.path, selectedExts);
-    if (added.length > 0) {
-      ui.showMessage(t().lfsAttrsUpdated(added.join(", ")), "success");
-    } else {
-      ui.showMessage(t().lfsAttrsNoChange, "info");
-    }
+    const set = new Set(exts.map((e) => e.toLowerCase()));
+    return sizeBlocked
+      .filter((b) => set.has(b.file.path.slice(b.file.path.lastIndexOf(".")).toLowerCase()))
+      .map((b) => b.file);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    ui.showMessage(`.gitattributes update failed: ${msg}`, "error");
-    return empty;
+    logger.warn({ repo: repo.path, err }, "LFS auto-promotion failed");
+    return [];
   }
-
-  // Bitbucket capacity warning
-  try {
-    const { simpleGit } = await import("simple-git");
-    const git = simpleGit(repo.path);
-    const remotes = await git.getRemotes(true);
-    if (remotes.some((r) => isBitbucketRemote(r.refs.push ?? r.refs.fetch ?? ""))) {
-      ui.showMessage(t().lfsBitbucketWarn, "warn");
-    }
-  } catch {
-    // ignore
-  }
-
-  // Promote selected extension files from blocked → safe
-  const selectedSet = new Set(selectedExts.map((e) => e.toLowerCase()));
-  const promoted: FileChange[] = [];
-  for (const b of sizeBlocked) {
-    const ext = b.file.path.slice(b.file.path.lastIndexOf(".")).toLowerCase();
-    if (selectedSet.has(ext)) {
-      promoted.push(b.file);
-    }
-  }
-
-  // .gitattributes file to include in commit
-  const gitattributesFile: FileChange = {
-    path: ".gitattributes",
-    status: "modified",
-    size: 0,
-    isBinary: false,
-  };
-
-  ui.showMessage(t().lfsFilesIncluded(promoted.length), "success");
-  return { promoted, gitattributesFile };
 }
 
 async function getDiff(repo: RepoState, files: FileChange[]): Promise<string> {
   const { simpleGit } = await import("simple-git");
   const git = simpleGit(repo.path);
 
-  // Stage files one by one, skipping any that fail (e.g. gitignored)
   for (const f of files) {
     try {
       if (f.status === "deleted") {
@@ -479,13 +338,12 @@ async function getDiff(repo: RepoState, files: FileChange[]): Promise<string> {
         await git.add(f.path);
       }
     } catch {
-      // Skip files that can't be staged (gitignored, etc.)
+      // skip un-stageable files (gitignored etc.)
     }
   }
 
   const filePaths = files.map((f) => f.path);
-  const diff = await git.diff(["--cached", "--", ...filePaths]);
-  return diff;
+  return git.diff(["--cached", "--", ...filePaths]);
 }
 
 program.parse();

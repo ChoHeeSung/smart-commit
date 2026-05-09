@@ -9,15 +9,15 @@ import { useEffect, useState } from "react";
  */
 export function useTerminalSize(): { columns: number; rows: number } {
   const [size, setSize] = useState(() => ({
-    columns: process.stdout.columns ?? 80,
-    rows: process.stdout.rows ?? 40,
+    columns: process.stdout.columns || 80,
+    rows: process.stdout.rows || 40,
   }));
 
   useEffect(() => {
     const onResize = () => {
       setSize({
-        columns: process.stdout.columns ?? 80,
-        rows: process.stdout.rows ?? 40,
+        columns: process.stdout.columns || 80,
+        rows: process.stdout.rows || 40,
       });
     };
     process.stdout.on("resize", onResize);

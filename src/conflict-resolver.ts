@@ -69,15 +69,8 @@ export async function resolveConflicts(
         ui.showMessage(`  theirs: ${block.theirs.split("\n")[0].trim()}...`, "info");
         ui.showMessage(`  merged: ${merged.split("\n")[0].trim()}...`, "info");
 
-        const confirmed = await ui.confirmWarned(
-          { path: repoPath, branch: "", status: "merging", files: [], unpushedCommits: 0, hasRemote: false },
-          [{ path: `${filePath} (블록 ${i + 1})`, status: "modified", size: 0, isBinary: false }],
-        );
-
-        if (confirmed) {
-          resolved = replaceConflictBlock(resolved, block, merged);
-          resolvedCount++;
-        }
+        resolved = replaceConflictBlock(resolved, block, merged);
+        resolvedCount++;
       }
 
       if (resolvedCount === blocks.length) {

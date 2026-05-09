@@ -11,29 +11,31 @@ import { scanRepositories } from "./scanner.js";
 import { classifyFiles, groupFiles } from "./classifier.js";
 import { createAiClient, isAiAvailable, getOfflineTemplates } from "./ai-client.js";
 import { createLogger } from "./logger.js";
-import type { RepoState } from "./types.js";
+import type { UI } from "./ui/index.js";
 
 const logger = createLogger();
 
 // Noop UI for MCP (no terminal interaction)
-const noopUI = {
+const noopUI: UI = {
   showHeader: () => {},
   showProgress: () => {},
-  showRepoTable: () => {},
-  selectRepos: async (repos: RepoState[]) => repos,
-  showBlocked: () => {},
-  confirmWarned: async () => true,
-  confirmLfsInit: async () => false,
-  selectLfsExtensions: async () => [] as string[],
-  confirmLfsInstall: async () => false,
-  showCommitPreview: () => {},
-  promptGroupAction: async () => "commit" as const,
-  promptPushAction: async () => "push" as const,
-  promptOfflineTemplate: async (t: string[]) => t[0] + "auto-commit",
-  promptInput: async () => "",
   showMessage: () => {},
   showSpinner: () => () => {},
-  showComplete: () => {},
+  runSelect: async (repos) => repos.filter((r) => r.status === "dirty"),
+  runPreview: async (initial) => ({
+    proceed: true,
+    previews: initial.map((p) => ({ repo: p.repo, groups: [], status: "ready" as const })),
+  }),
+  runExecute: async (plan) => ({
+    total: plan.length,
+    committed: 0,
+    pushed: 0,
+    failed: 0,
+    skipped: plan.length,
+    failures: [],
+    skips: plan.map((p) => ({ repo: p.repo.path, reason: "MCP noop" })),
+  }),
+  runDone: async () => {},
   cleanup: () => {},
 };
 

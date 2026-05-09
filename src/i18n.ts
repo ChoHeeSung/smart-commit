@@ -36,19 +36,12 @@ export interface Messages {
   blockedReasonBinary: string;
   blockedReasonPattern: string;
   warnFiles: string;
-  includeQuestion: string;
   noSafeFiles: string;
   stagingSkipped: string;
   noStagedFiles: string;
 
   // LFS
-  lfsPromptTitle: string;
-  lfsPromptDesc: string;
-  lfsSelectExtensions: string;
-  lfsSelectHint: string;
   lfsNoExtensionsSelected: string;
-  lfsConfirm: string;
-  lfsDecline: string;
   lfsNotInstalled: string;
   lfsInstallPrompt: (pm: string, cmd: string) => string;
   lfsInstallSudoWarn: string;
@@ -68,21 +61,9 @@ export interface Messages {
   aiGenerating: string;
   aiGroupReason: string;
   aiFailed: string;
-  offlineSwitch: string;
-  offlineSelect: string;
-  offlineInputMsg: string;
 
   // Actions — group prompt (per commit group)
-  selectGroupAction: string;
-  actionCommit: string;
-  actionSkipGroup: string;
-  actionSkipRepo: string;
-  actionExit: string;
   // Actions — push prompt (per repo, after all group commits)
-  selectPushAction: string;
-  pushReadyHeader: (n: number) => string;
-  actionPush: string;
-  actionKeepLocal: string;
 
   // Commit
   commitDone: string;
@@ -96,8 +77,6 @@ export interface Messages {
   pushRetry: string;
   pushRetryDone: string;
   pushFailFinal: string;
-  unpushedFound: (count: number) => string;
-  dryRunSkipPush: string;
   noRemoteSkipPush: string;
   noRemoteCommitOnly: string;
 
@@ -108,12 +87,9 @@ export interface Messages {
   skipping: string;
   skipRepo: string;
   exiting: string;
-  localCommitKept: string;
-  allComplete: string;
 
   // Repo selection
   selectRepos: string;
-  selectReposHint: string;
   noReposSelected: string;
 
   // Hook
@@ -186,18 +162,11 @@ const ko: Messages = {
   blockedReasonBinary: "바이너리",
   blockedReasonPattern: "민감 패턴",
   warnFiles: "주의 필요한 파일",
-  includeQuestion: "포함하시겠습니까?",
   noSafeFiles: "커밋할 안전한 파일이 없습니다.",
   stagingSkipped: "staging 건너뜀",
   noStagedFiles: "staging된 파일이 없습니다.",
 
-  lfsPromptTitle: "💾 Git LFS로 이 파일들을 관리하시겠습니까?",
-  lfsPromptDesc: ".gitattributes가 자동 생성/업데이트됩니다.",
-  lfsSelectExtensions: "LFS로 추적할 확장자를 선택하세요",
-  lfsSelectHint: "(↑↓: 이동, Space: 토글, a: 전체, Enter: 확정, ESC: 취소)",
   lfsNoExtensionsSelected: "선택된 확장자가 없습니다 — LFS 단계를 건너뜁니다.",
-  lfsConfirm: "LFS 초기화를 진행합니다.",
-  lfsDecline: "LFS를 사용하지 않습니다. 차단된 파일은 제외됩니다.",
   lfsNotInstalled: "git-lfs가 설치되어 있지 않습니다.",
   lfsInstallPrompt: (pm, cmd) => `자동 설치를 진행할까요?\n     Package Manager: ${pm}\n     실행 예정: ${cmd}\n  (Y/n)`,
   lfsInstallSudoWarn: "⚠ sudo 권한이 필요합니다. 비밀번호를 요구할 수 있습니다.",
@@ -216,19 +185,7 @@ const ko: Messages = {
   aiGenerating: "AI 커밋 메시지 생성 중...",
   aiGroupReason: "그룹핑 이유",
   aiFailed: "AI 메시지 생성 실패",
-  offlineSwitch: "오프라인 템플릿으로 전환합니다.",
-  offlineSelect: "AI 사용 불가 — 오프라인 템플릿을 선택하세요:",
-  offlineInputMsg: "커밋 메시지를 입력하세요 (접두사 포함):",
 
-  selectGroupAction: "Commit?",
-  actionCommit: "Commit (커밋 진행)",
-  actionSkipGroup: "Skip this group (이 그룹 건너뜀)",
-  actionSkipRepo: "Skip rest of repo (이 저장소 남은 그룹 건너뜀)",
-  actionExit: "Exit (종료)",
-  selectPushAction: "Push?",
-  pushReadyHeader: (n) => `${n}개 커밋 푸시 대기 중`,
-  actionPush: "Push (지금 푸시)",
-  actionKeepLocal: "Keep local only (로컬 커밋 유지)",
 
   commitDone: "커밋 완료",
   commitFailed: "커밋 실패",
@@ -240,8 +197,6 @@ const ko: Messages = {
   pushRetry: "pull 후 재시도합니다...",
   pushRetryDone: "pull 후 푸시 성공!",
   pushFailFinal: "pull/push 실패",
-  unpushedFound: (n) => `푸시되지 않은 커밋 ${n}개`,
-  dryRunSkipPush: "(dry-run) 푸시를 수행하지 않습니다.",
   noRemoteSkipPush: "리모트 저장소 미설정 — 푸시를 건너뜁니다.",
   noRemoteCommitOnly: "리모트 저장소 미설정 — 커밋만 수행합니다.",
 
@@ -250,11 +205,8 @@ const ko: Messages = {
   skipping: "건너뜁니다.",
   skipRepo: "저장소 건너뛰기",
   exiting: "종료합니다.",
-  localCommitKept: "로컬 커밋 유지, 푸시 건너뜀",
-  allComplete: "모든 저장소 작업 완료!",
 
   selectRepos: "처리할 저장소를 선택하세요",
-  selectReposHint: "(↑↓: 이동, Space: 토글, a: 전체, Enter: 확정)",
   noReposSelected: "선택된 저장소가 없습니다.",
 
   hookInstalled: "훅 설치 완료",
@@ -324,18 +276,11 @@ const en: Messages = {
   blockedReasonBinary: "binary",
   blockedReasonPattern: "sensitive pattern",
   warnFiles: "Files requiring attention",
-  includeQuestion: "Include these files?",
   noSafeFiles: "No safe files to commit.",
   stagingSkipped: "staging skipped",
   noStagedFiles: "No files staged.",
 
-  lfsPromptTitle: "💾 Manage these files with Git LFS?",
-  lfsPromptDesc: ".gitattributes will be created/updated automatically.",
-  lfsSelectExtensions: "Select extensions to track with LFS",
-  lfsSelectHint: "(↑↓: move, Space: toggle, a: all, Enter: confirm, ESC: cancel)",
   lfsNoExtensionsSelected: "No extensions selected — skipping LFS step.",
-  lfsConfirm: "Proceeding with LFS setup.",
-  lfsDecline: "Skipping LFS. Blocked files will be excluded.",
   lfsNotInstalled: "git-lfs is not installed.",
   lfsInstallPrompt: (pm, cmd) => `Install automatically?\n     Package Manager: ${pm}\n     Command: ${cmd}\n  (Y/n)`,
   lfsInstallSudoWarn: "⚠ sudo privileges required. You may be asked for password.",
@@ -354,19 +299,7 @@ const en: Messages = {
   aiGenerating: "Generating commit message with AI...",
   aiGroupReason: "Grouping reason",
   aiFailed: "AI message generation failed",
-  offlineSwitch: "Switching to offline templates.",
-  offlineSelect: "AI unavailable — select an offline template:",
-  offlineInputMsg: "Enter commit message (with prefix):",
 
-  selectGroupAction: "Commit?",
-  actionCommit: "Commit",
-  actionSkipGroup: "Skip this group",
-  actionSkipRepo: "Skip rest of repo",
-  actionExit: "Exit",
-  selectPushAction: "Push?",
-  pushReadyHeader: (n) => `${n} commit(s) ready to push`,
-  actionPush: "Push",
-  actionKeepLocal: "Keep local only",
 
   commitDone: "Committed",
   commitFailed: "Commit failed",
@@ -378,8 +311,6 @@ const en: Messages = {
   pushRetry: "Retrying after pull...",
   pushRetryDone: "Push successful after pull!",
   pushFailFinal: "Pull/push failed",
-  unpushedFound: (n) => `${n} unpushed commit(s)`,
-  dryRunSkipPush: "(dry-run) Skipping push.",
   noRemoteSkipPush: "No remote configured — skipping push.",
   noRemoteCommitOnly: "No remote configured — commit only.",
 
@@ -388,11 +319,8 @@ const en: Messages = {
   skipping: "Skipping.",
   skipRepo: "Skipping repository",
   exiting: "Exiting.",
-  localCommitKept: "Local commit kept, push skipped",
-  allComplete: "All repositories processed!",
 
   selectRepos: "Select repositories to process",
-  selectReposHint: "(↑↓: move, Space: toggle, a: all, Enter: confirm)",
   noReposSelected: "No repositories selected.",
 
   hookInstalled: "Hooks installed",
