@@ -5,7 +5,7 @@
 
 AI-powered intelligent Git auto-commit & push CLI tool
 
-Scans all Git repositories under the current directory, lets AI (Gemini/Claude/GPT/Ollama) analyze your diffs and generate commit messages automatically. Dangerous files like `.env` are filtered out, and commit messages follow the Conventional Commits format.
+Scans all Git repositories under the current directory, lets AI (Antigravity/Claude/Gemini/GPT/Ollama) analyze your diffs and generate commit messages automatically. Dangerous files like `.env` are filtered out, and commit messages follow the Conventional Commits format.
 
 ![smart-commit dashboard](asset/dashboard.png)
 *Single-screen dashboard — left pane: repositories · right pane: current commit preview + live log (built with Ink, React-for-CLI)*
@@ -28,8 +28,9 @@ smart-commit
 
 | AI Tool | Install |
 |---------|---------|
+| [Antigravity CLI](https://antigravity.google/docs/cli) (`agy`) | Google official CLI (default) |
+| [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) | Anthropic official CLI (default fallback) |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
-| [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) | Anthropic official CLI |
 | [OpenAI CLI](https://platform.openai.com/docs/guides/command-line) | `pip install openai` |
 | [Ollama](https://ollama.com/) | `brew install ollama` |
 
@@ -139,9 +140,9 @@ Create `.smart-commitrc.yaml` in your project root or home directory. Uses [cosm
 
 ```yaml
 ai:
-  primary: gemini          # gemini | claude | gpt | ollama
+  primary: agy             # agy | claude | gemini | gpt | ollama
   fallback: claude         # Fallback AI
-  timeout: 30              # AI response timeout (seconds)
+  timeout: 60              # AI response timeout (seconds)
   ollama:
     model: llama3
     host: http://localhost:11434
@@ -279,7 +280,7 @@ src/
 ├── config.ts             Config loading (cosmiconfig)
 ├── scanner.ts            Repo discovery + Git state handling
 ├── classifier.ts         Safety filter + AI/rule-based grouping
-├── ai-client.ts          AI calls (Gemini/Claude/GPT/Ollama) + validation
+├── ai-client.ts          AI calls (Antigravity/Claude/Gemini/GPT/Ollama) + validation
 ├── committer.ts          Commit/push + pull retry + error diagnosis
 ├── conflict-resolver.ts  Block-level AI conflict resolution
 ├── ui/                   Ink (React-for-CLI) single-page dashboard

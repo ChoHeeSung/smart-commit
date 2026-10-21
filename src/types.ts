@@ -1,4 +1,4 @@
-export type AiTool = "gemini" | "claude" | "gpt" | "ollama" | string;
+export type AiTool = "agy" | "claude" | "gemini" | "gpt" | "ollama" | string;
 
 export interface OllamaConfig {
   model: string;

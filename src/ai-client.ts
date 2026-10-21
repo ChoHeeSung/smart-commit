@@ -195,6 +195,14 @@ function buildAiCommand(
   config?: SmartCommitConfig,
 ): { command: string; args: string[] } {
   switch (tool) {
+    case "agy":
+    case "antigravity": {
+      // `-p` consumes the prompt as its value, so flags must follow the prompt.
+      // agy's own print timeout defaults to 5m — pull it below the execa timeout
+      // so agy exits cleanly instead of being killed mid-flight.
+      const printTimeout = Math.max(5, (config?.ai?.timeout ?? 60) - 5);
+      return { command: "agy", args: ["-p", prompt, "--print-timeout", `${printTimeout}s`] };
+    }
     case "gemini":
       return { command: "gemini", args: [prompt] };
     case "claude":

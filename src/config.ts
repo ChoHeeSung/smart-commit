@@ -3,9 +3,9 @@ import type { SmartCommitConfig } from "./types.js";
 
 const DEFAULT_CONFIG: SmartCommitConfig = {
   ai: {
-    primary: "gemini",
+    primary: "agy",
     fallback: "claude",
-    timeout: 30,
+    timeout: 60,
   },
   safety: {
     maxFileSize: "10MB",

@@ -5,7 +5,7 @@
 
 AI 기반 지능형 Git 자동 커밋 & 푸시 CLI 도구
 
-현재 디렉토리 하위의 모든 Git 저장소를 한 번에 스캔하여, AI(Gemini/Claude/GPT/Ollama)가 diff를 분석하고 커밋 메시지를 자동 생성합니다. `.env` 같은 위험한 파일은 알아서 걸러주고, 커밋 메시지도 Conventional Commits 형식으로 깔끔하게 만들어줍니다.
+현재 디렉토리 하위의 모든 Git 저장소를 한 번에 스캔하여, AI(Antigravity/Claude/Gemini/GPT/Ollama)가 diff를 분석하고 커밋 메시지를 자동 생성합니다. `.env` 같은 위험한 파일은 알아서 걸러주고, 커밋 메시지도 Conventional Commits 형식으로 깔끔하게 만들어줍니다.
 
 ![smart-commit dashboard](asset/dashboard.png)
 *단일 화면 대시보드 — 좌측 저장소 목록 · 우측 커밋 프리뷰 + 실시간 로그 (Ink React-for-CLI 기반)*
@@ -28,8 +28,9 @@ smart-commit
 
 | AI 도구 | 설치 방법 |
 |---------|----------|
+| [Antigravity CLI](https://antigravity.google/docs/cli) (`agy`) | Google 공식 CLI (기본값) |
+| [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) | Anthropic 공식 CLI (폴백 기본값) |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
-| [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) | Anthropic 공식 CLI |
 | [OpenAI CLI](https://platform.openai.com/docs/guides/command-line) | `pip install openai` |
 | [Ollama](https://ollama.com/) | `brew install ollama` |
 
@@ -168,9 +169,9 @@ FEAT: 로그인 추가               # 대문자 type
 
 ```yaml
 ai:
-  primary: gemini          # 기본 AI: gemini | claude | gpt | ollama
+  primary: agy             # 기본 AI: agy | claude | gemini | gpt | ollama
   fallback: claude         # 실패 시 대체 AI
-  timeout: 30              # AI 응답 타임아웃 (초)
+  timeout: 60              # AI 응답 타임아웃 (초)
   ollama:                  # Ollama 사용 시 설정
     model: llama3
     host: http://localhost:11434
@@ -304,7 +305,7 @@ src/
 ├── config.ts             설정 로딩 (cosmiconfig)
 ├── scanner.ts            저장소 탐색 + Git 상태 예외 처리
 ├── classifier.ts         안전 필터 + AI/규칙 기반 그룹핑
-├── ai-client.ts          AI 호출 (Gemini/Claude/GPT/Ollama) + 검증
+├── ai-client.ts          AI 호출 (Antigravity/Claude/Gemini/GPT/Ollama) + 검증
 ├── committer.ts          커밋/푸시 + pull 재시도
 ├── conflict-resolver.ts  충돌 마커 단위 AI 해결
 ├── ui/                   Ink(React-for-CLI) 단일 페이지 대시보드

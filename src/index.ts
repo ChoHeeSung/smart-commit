@@ -28,7 +28,7 @@ program
   .version(PKG_VERSION)
   .option("-d, --dry-run", "Preview without committing or pushing")
   .option("-g, --group <strategy>", "Grouping strategy: smart | single | manual")
-  .option("-a, --ai <tool>", "AI tool: gemini | claude | gpt | ollama")
+  .option("-a, --ai <tool>", "AI tool: agy | claude | gemini | gpt | ollama")
   .option("--no-interactive", "Headless mode (no prompts)")
   .option("--offline", "Offline mode (use templates instead of AI)")
   .option("--lang <locale>", "UI language: ko | en (auto-detected from system)")
